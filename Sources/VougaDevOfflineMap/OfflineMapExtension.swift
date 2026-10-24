@@ -97,11 +97,11 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
     }
 
     /// A template's key: the same template, the same tiles on the phone.
-    static func sourceKey(_ template: String) -> String {
+    nonisolated static func sourceKey(_ template: String) -> String {
         SHA256.hash(data: Data(template.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
-    static func isTemplate(_ template: String?) -> Bool {
+    nonisolated static func isTemplate(_ template: String?) -> Bool {
         guard let template, template.hasPrefix("https://"), URL(string: TileMath.url(template, z: 0, x: 0, y: 0)) != nil else { return false }
         return ["{z}", "{x}", "{y}"].allSatisfy(template.contains)
     }
@@ -239,7 +239,7 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
         task.didFinish()
     }
 
-    static func contentType(_ data: Data?) -> String {
+    nonisolated static func contentType(_ data: Data?) -> String {
         guard let first = data?.first else { return "application/octet-stream" }
         switch first {
         case 0x89: return "image/png"
