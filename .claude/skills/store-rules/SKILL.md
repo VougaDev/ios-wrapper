@@ -27,6 +27,10 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - **No browser chrome.** No address bar, no "open in browser" for the app's own pages, and no blank page when offline
   (a native offline screen instead). Sign-in in the system browser session (`ASWebAuthenticationSession` on iOS,
   AppAuth on Android) is fine.
+- **The shell's core alone is never enough.** Core = the WebView, the system sign-in, the link rules, the offline
+  screen. Every app enables at least one real native extension that matters to its users: `tracking`, `offline-map`
+  (the site's own maps keep working offline), a scanner, push, or its own native screens. An app whose
+  `VougaDevNative.features()` is empty is a web clipping (4.2.2) and will be rejected.
 - **Review notes** list these features with the steps to see them, and give a **demo account** that has content
   (2.1). Without content, the reviewer sees an empty website and rejects it.
 - **4.2.6 / 4.3 (templates and spam).** The shared VougaDev shell is our own code, not a commercial generator, so one
@@ -87,12 +91,12 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 
 ### Apple 5.1.1 and Google User Data: privacy and account deletion
 
-- **Privacy policy:** linked in the store listing AND reachable inside the app in a few taps. In Ship it is in the
-  account menu and at `/privacy/`. It says what is collected, why, who receives it, how long it is kept, and how to ask
-  for deletion.
-- **Account deletion inside the app:** required by both stores when accounts can be created. A direct link to the account
-  service's deletion page is accepted; it sits in the account menu ("Delete my account"). Google also wants that URL
-  in the Data safety form.
+- **Privacy policy:** linked in the store listing AND easy to find inside the app. A "Privacy and data" screen reached
+  from the account menu (or the native settings) is right: a few taps away, never in the way of daily use. The policy
+  says what is collected, why, who receives it, how long it is kept, and how to ask for deletion.
+- **Account deletion inside the app:** required by both stores when accounts can be created. It sits on that "Privacy
+  and data" screen, not in the main menu: a direct link to the account service's deletion page is accepted. Google
+  also wants that URL in the Data safety form.
 - **Data safety (Google) and the privacy "nutrition label" (Apple):** must match what the code sends: location, name,
   e-mail, phone, photos. No tracking, no ads unless declared.
 
@@ -108,6 +112,20 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - **Android:** a foreground service of type `location`, started while the app is visible, with its notification
   shown. Never `ACCESS_BACKGROUND_LOCATION` unless truly needed: it brings a separate Play review and video.
 - **Play Console:** the foreground-service declaration needs a short video of start, notification and stop.
+
+### Notifications, install prompts, consent
+
+- **Notifications:** ask right after sign-in, with one sentence saying what will be sent and why, then the system
+  prompt. Never at first launch with no reason, and never as a condition to use the app (Apple 5.1.2, 4.5.4).
+  Managing them (per topic) is part of the core: a native screen, or the account service's page, reachable from
+  "Privacy and data". Never send ads by push unless the person opted in.
+- **One hub sends every app's notifications.** Each push therefore says which app it belongs to and what it opens: a
+  page of that app's site, or a native screen through the app's own extension. Tapped in another app, or with the
+  target app missing, it opens the page in the browser. It never opens a blank screen.
+- **No "install the app" prompt, button or banner inside the app** (no PWA install, no add-to-home-screen): the page
+  hides them when the app's user agent or `VougaDevNative` is present.
+- **Cookie or data consent:** inside the app, a native dialog asked once, never the website's banner over the
+  WebView. The choice is passed to the site, and the site hides its own banner in the app.
 
 ### Other reasons for rejection
 
@@ -134,8 +152,8 @@ Report each line as done, failed and fixed, or skipped (with why). Never say "co
      or a link to `/app/` or `/static/download/`.
    - Fail with either user agent if a page offers a `.apk` or install instructions.
    - Fail with the iOS user agent if a page sells a digital feature, unless through in-app purchase.
-   - Fail with either user agent if the privacy link is more than about 2 taps away, or the account deletion link is
-     missing from the account menu.
+   - Fail with either user agent if "Privacy and data" (policy, account deletion, notification settings) is more than
+     about 3 taps away, if a page shows an install prompt, or if the site's cookie banner appears in the app.
 2. **Native texts.** Grep the native resources for `Android|Google Play|apk|Play Store` in the iOS project, and for
    `apk|install` in the Android one. Also grep for placeholder text, "TODO", and other products' names (e.g. "PIVO").
 3. **Manifest and plist.**
