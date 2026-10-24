@@ -1,4 +1,5 @@
 import CoreLocation
+import VougaDevOfflineMap
 import XCTest
 @testable import VougaDevShell
 @testable import VougaDevTracking
@@ -294,7 +295,7 @@ final class LocalizationTests: XCTestCase {
     }
 
     func testEveryTextInEnglishFrenchAndSpanish() throws {
-        for bundle in [ShellResources.bundle, TrackingResources.bundle] {
+        for bundle in [ShellResources.bundle, TrackingResources.bundle, OfflineMapResources.bundle] {
             let english = try table("en", bundle)
             XCTAssertFalse(english.isEmpty)
             for language in ["fr", "es"] {
@@ -310,7 +311,7 @@ final class LocalizationTests: XCTestCase {
 
     /// App Review 2.3.10: no other platform named inside the app.
     func testNoOtherPlatformIsNamed() throws {
-        for bundle in [ShellResources.bundle, TrackingResources.bundle] {
+        for bundle in [ShellResources.bundle, TrackingResources.bundle, OfflineMapResources.bundle] {
             for language in ["en", "fr", "es"] {
                 for text in try table(language, bundle).values {
                     XCTAssertNil(text.range(of: "android|google play|play store|\\.apk", options: [.regularExpression, .caseInsensitive]), text)

@@ -69,7 +69,7 @@ final class BridgeTests: XCTestCase {
         let tracking = TrackingExtension(paths: paths)
         let session = AppSession(config: config, extensions: [tracking])
         XCTAssertNotNil(tracking.service, "attached to the session")
-        XCTAssertEqual(session.features, ["tracking", "push"])
+        XCTAssertEqual(session.features, ["tracking"])
         let controller = ShellViewController(session: session)
         for selector in [
             "webView:decidePolicyForNavigationAction:decisionHandler:",

@@ -63,6 +63,22 @@ public protocol ShellExtension: AnyObject {
 
     /// Signing out, while the site's session is still open: stop what works for this person and forget what is kept.
     func signOut() async
+
+    /// Its rows in the native Settings, "On this phone" (an offline map's size).
+    func settingsEntries(host: ShellHost) -> [ShellSettingsEntry]
+}
+
+/// One row an extension adds to Settings: a title, a value, and what a tap does (nil: nothing).
+public struct ShellSettingsEntry {
+    public var title: String
+    public var detail: String?
+    public var action: ((UIViewController) -> Void)?
+
+    public init(title: String, detail: String? = nil, action: ((UIViewController) -> Void)? = nil) {
+        self.title = title
+        self.detail = detail
+        self.action = action
+    }
 }
 
 public extension ShellExtension {
@@ -74,6 +90,7 @@ public extension ShellExtension {
     func signedInPage(host: ShellHost) {}
     func becameActive(host: ShellHost) {}
     func signOut() async {}
+    func settingsEntries(host: ShellHost) -> [ShellSettingsEntry] { [] }
 }
 
 extension ShellRequirements {

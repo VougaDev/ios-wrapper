@@ -1,0 +1,5 @@
+/* La carte hors ligne dans les Réglages. */
+"offline_map_title" = "Carte hors ligne";
+"offline_map_none" = "Aucune pour le moment";
+"offline_map_delete_text" = "Supprimer la carte gardée sur ce téléphone ? Elle sera téléchargée de nouveau en Wi-Fi.";
+"offline_map_delete" = "Supprimer";

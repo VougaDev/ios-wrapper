@@ -1,9 +1,10 @@
 import UIKit
 import WebKit
 
-/// COOKIE AND DATA CONSENT, AS A NATIVE DIALOG, asked once, never the website's banner over the web view. The choice
-/// goes to the site as a first-party cookie (`<cookieName>=<purpose>=1&<purpose>=0`), so the site hides its own banner
-/// and honours it; pages read it too through `VougaDevNative.consent()`. It can be changed in Settings, "Privacy and data".
+/// COOKIE AND DATA CONSENT, AS A NATIVE DIALOG, asked once, never the website's banner over the web view. Each purpose is
+/// off until the person turns it on. The choice goes to the site as a first-party cookie
+/// (`<cookieName>=<purpose>:1|<purpose>:0`), so the site hides its own banner and honours it; pages read it too through
+/// `VougaDevNative.consent()` (`{<purpose>: true|false}`). It can be changed in Settings, "Privacy and data".
 @MainActor
 public final class ShellConsent {
 
@@ -43,8 +44,10 @@ public final class ShellConsent {
     /// The person's answer per purpose; nil until asked.
     var choices: [String: Bool]? { defaults.dictionary(forKey: "consent.choices") as? [String: Bool] }
 
-    /// `consent()`: `{asked, choices: {<purpose>: true|false}}`.
-    func state() -> JSONObject { ["asked": choices != nil, "choices": choices ?? [:]] }
+    /// `consent()`: `{<purpose>: true|false}` for every purpose, all false before the person answered.
+    func state() -> JSONObject {
+        Dictionary(settings.purposes.map { ($0.key, choices?[$0.key] == true) }, uniquingKeysWith: { first, _ in first })
+    }
 
     /// [then] runs once the person answered, at once when they already did (unless [again], from Settings).
     func ask(from presenter: UIViewController, again: Bool = false, then: @escaping () -> Void) {
@@ -67,13 +70,14 @@ public final class ShellConsent {
         top.present(alert, animated: true)
     }
 
-    static func cookieValue(_ choices: [String: Bool]) -> String {
-        choices.keys.sorted().map { "\($0)=\(choices[$0]! ? 1 : 0)" }.joined(separator: "&")
+    /// `analytics:1|ads:0`, in the purposes' order.
+    func cookieValue(_ choices: [String: Bool]) -> String {
+        settings.purposes.map { "\($0.key):\(choices[$0.key] == true ? 1 : 0)" }.joined(separator: "|")
     }
 
     func cookie(_ choices: [String: Bool]) -> HTTPCookie? {
         HTTPCookie(properties: [
-            .name: settings.cookieName, .value: Self.cookieValue(choices), .domain: origin.host, .path: "/",
+            .name: settings.cookieName, .value: cookieValue(choices), .domain: origin.host, .path: "/",
             .secure: origin.scheme == "https" ? "TRUE" : "FALSE", .expires: Date().addingTimeInterval(365 * 24 * 3600),
         ])
     }

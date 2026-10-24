@@ -34,7 +34,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     /// The core plus the extensions this app uses: what `VougaDevNative.features()` lists.
     @MainActor static let session = AppSession(config: .app, extensions: [
         TrackingExtension(paths: TrackingPaths(position: "/api/missions/{id}/position", target: "/api/missions/tracking")),
-        OfflineMapExtension(),
+        OfflineMapExtension(config: OfflineMapConfig(manifestPath: "/api/map/offline", tilePath: "/tiles/{source}/{z}/{x}/{y}")),
     ])
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {

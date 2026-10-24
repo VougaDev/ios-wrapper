@@ -1,0 +1,5 @@
+/* El mapa sin conexión en Ajustes. */
+"offline_map_title" = "Mapa sin conexión";
+"offline_map_none" = "Ninguno por ahora";
+"offline_map_delete_text" = "¿Eliminar el mapa guardado en este teléfono? Se volverá a descargar con Wi-Fi.";
+"offline_map_delete" = "Eliminar";

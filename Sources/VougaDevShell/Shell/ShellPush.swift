@@ -19,14 +19,18 @@ public enum NotificationRoute: Equatable {
     case outside(URL)
     case home
 
+    /// An older payload with a same-origin path in `url` and no `app` is this app's.
     public static func decide(_ payload: [AnyHashable: Any], appSlug: String, origin: AppOrigin) -> NotificationRoute {
-        let url = (payload["url"] as? String).flatMap(URL.init(string:)).flatMap { $0.scheme?.lowercased() == "https" ? $0 : nil }
-        let app = payload["app"] as? String
-        guard app == nil || app == appSlug else { return url.map(NotificationRoute.outside) ?? .home }
-        let own = url.flatMap { origin.matches($0) ? $0 : nil }
-        if let key = payload["screen"] as? String, !key.isEmpty { return .screen(key: key, fallback: own) }
-        if let own { return .page(own) }
-        return url.map(NotificationRoute.outside) ?? .home
+        let raw = (payload["url"] as? String)?.trimmingCharacters(in: .whitespaces) ?? ""
+        let app = (payload["app"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? appSlug
+        let own: URL? = raw.hasPrefix("/") ? origin.pageURL(raw).flatMap(URL.init(string:))
+            : URL(string: raw).flatMap { origin.matches($0) ? $0 : nil }
+        let https = URL(string: raw).flatMap { $0.scheme?.lowercased() == "https" && $0.host?.isEmpty == false ? $0 : nil }
+        if app != appSlug || (!raw.isEmpty && own == nil) { return https.map(NotificationRoute.outside) ?? .home }
+        if let key = payload["screen"] as? String, key.range(of: "^[a-z][a-z0-9_.:-]{0,63}$", options: .regularExpression) != nil {
+            return .screen(key: key, fallback: own)
+        }
+        return own.map(NotificationRoute.page) ?? .home
     }
 }
 

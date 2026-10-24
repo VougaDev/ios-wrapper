@@ -15,7 +15,7 @@ let package = Package(
     targets: [
         .target(name: "VougaDevShell", resources: [.process("Resources")]),
         .target(name: "VougaDevTracking", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
-        .target(name: "VougaDevOfflineMap", dependencies: ["VougaDevShell"]),
+        .target(name: "VougaDevOfflineMap", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
         .testTarget(name: "VougaDevShellTests", dependencies: ["VougaDevShell", "VougaDevTracking", "VougaDevOfflineMap"]),
     ]
 )

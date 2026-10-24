@@ -12,7 +12,7 @@ import UIKit
 final class SettingsViewController: UITableViewController {
 
     private enum Row {
-        case version, permission, topics, privacy, consent, deleteAccount, signOut
+        case version, permission, topics, entry(ShellSettingsEntry), privacy, consent, deleteAccount, signOut
     }
 
     private let session: AppSession
@@ -21,7 +21,7 @@ final class SettingsViewController: UITableViewController {
     private var sections: [(title: String?, rows: [Row])] = []
     private var permissionText = ""
 
-    init(session: AppSession, openPage: @escaping (String) -> Void, signOut: @escaping () -> Void) {
+    init(session: AppSession, host: ShellHost, openPage: @escaping (String) -> Void, signOut: @escaping () -> Void) {
         self.session = session
         self.openPage = openPage
         self.signOut = signOut
@@ -32,6 +32,8 @@ final class SettingsViewController: UITableViewController {
         if let push = config.push {
             sections.append((Strings.text("settings_notifications"), push.preferencesURL == nil ? [.permission] : [.permission, .topics]))
         }
+        let entries = session.extensions.flatMap { $0.settingsEntries(host: host) }
+        if !entries.isEmpty { sections.append((Strings.text("settings_on_this_phone"), entries.map(Row.entry))) }
         var privacy: [Row] = []
         if config.privacyPath != nil { privacy.append(.privacy) }
         if config.consent != nil { privacy.append(.consent) }
@@ -82,6 +84,13 @@ final class SettingsViewController: UITableViewController {
             content.text = Strings.text("settings_notifications_permission")
             content.secondaryText = permissionText
         case .topics: content.text = Strings.text("settings_notifications_topics")
+        case let .entry(entry):
+            content.text = entry.title
+            content.secondaryText = entry.detail
+            if entry.action == nil {
+                cell.accessoryType = .none
+                cell.selectionStyle = .none
+            }
         case .privacy: content.text = Strings.text("settings_privacy_policy")
         case .consent: content.text = Strings.text("settings_consent")
         case .deleteAccount: content.text = Strings.text("settings_delete_account")
@@ -110,6 +119,8 @@ final class SettingsViewController: UITableViewController {
                     await UIApplication.shared.open(url)
                 }
             }
+        case let .entry(entry):
+            entry.action?(self)
         case .topics:
             if let url = config.push?.preferencesURL.flatMap(URL.init(string:)) { UIApplication.shared.open(url) }
         case .privacy:

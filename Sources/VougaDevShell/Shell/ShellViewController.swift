@@ -489,14 +489,14 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 answer(NativeBridge.ok())
             }),
             ("consent", { [weak self] _, answer in
-                answer(self?.session.consent?.state() ?? ["asked": false, "choices": [String: Bool]()])
+                answer(self?.session.consent?.state() ?? [:])
             }),
         ]
     }
 
     /// The app's native Settings ([SettingsViewController]).
     public func openSettings() {
-        let settings = SettingsViewController(session: session, openPage: { [weak self] in self?.open($0) },
+        let settings = SettingsViewController(session: session, host: self, openPage: { [weak self] in self?.open($0) },
                                               signOut: { [weak self] in self?.signOut() })
         presenter.present(UINavigationController(rootViewController: settings), animated: true)
     }

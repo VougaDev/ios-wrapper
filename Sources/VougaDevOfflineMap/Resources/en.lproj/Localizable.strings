@@ -1,0 +1,5 @@
+/* The offline map in Settings. */
+"offline_map_title" = "Offline map";
+"offline_map_none" = "None yet";
+"offline_map_delete_text" = "Delete the map kept on this phone? It is downloaded again on Wi-Fi.";
+"offline_map_delete" = "Delete";

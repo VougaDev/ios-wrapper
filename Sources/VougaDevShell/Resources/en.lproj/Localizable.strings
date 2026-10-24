@@ -33,6 +33,7 @@
 "settings_notifications_on" = "On";
 "settings_notifications_off" = "Off";
 "settings_notifications_topics" = "Choose the notifications";
+"settings_on_this_phone" = "On this phone";
 "settings_privacy" = "Privacy and data";
 "settings_privacy_policy" = "Privacy policy";
 "settings_consent" = "Cookies and data";

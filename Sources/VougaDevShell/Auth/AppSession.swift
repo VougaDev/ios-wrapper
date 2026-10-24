@@ -28,8 +28,8 @@ open class AppSession {
     /// The consent dialog, when the configuration declares purposes.
     public private(set) lazy var consent: ShellConsent? = config.consent.map { ShellConsent(settings: $0, origin: origin, defaults: defaults) }
 
-    /// `features()`: the extensions present, and `push` when the configuration declares it.
-    public var features: [String] { extensions.map { $0.name } + (config.push == nil ? [] : ["push"]) }
+    /// `features()`: the extensions this app has (the core's own abilities are not listed).
+    public var features: [String] { extensions.map { $0.name } }
 
     public init(config: ShellConfig, extensions: [ShellExtension] = []) {
         self.config = config
