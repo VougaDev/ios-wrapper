@@ -37,6 +37,14 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
   - only a page never visited says it is not available offline, and it offers what is (the cached pages, the native
     screens), never a lone "retry" button.
   - A first launch with no network shows the app's own welcome, not an error.
+- **Never a raw error page.** A bare "Not Found", "Bad Gateway", a proxy's or CDN's error page, or a framework's
+  debug or CSRF page inside the app is a website showing through (4.2, and 2.1 completeness):
+  - the site serves its own page for every HTTP error (400, 403, 404, an expired form, 500), in its own layout and
+    language, with one sentence saying what happened and a way back (home, previous page). The 500 page needs nothing
+    that may have failed (no database, no menu). The API keeps its JSON errors;
+  - the shell catches a main-frame error that does not come from the site (502, 503 or 504 from the edge, a CDN's
+    error page, a timeout). It treats it as offline: the last cached copy of the page with a native bar, or the
+    native "not available" screen, never the raw page.
 - **The shell's core alone is never enough.** Core = the WebView, the system sign-in, the link rules, the offline
   screen. Every app enables at least one real native extension that matters to its users: `tracking`, `offline-map`
   (the site's own maps keep working offline), a scanner, push, or its own native screens. An app whose
@@ -176,11 +184,14 @@ Report each line as done, failed and fixed, or skipped (with why). Never say "co
    - relaunch: the app opens on the last pages from the phone, with the native screens;
    - tap through them, and try an action, which must be queued or wait, never fail.
    Any screen that is only "unavailable / retry" fails the check.
-6. **4.2 evidence.** List the native features with the steps to see each one, for the review notes. Make sure the demo
+6. **Errors.** Open a missing address, a forbidden page, and an expired form (a POST with a wrong CSRF token). Each one
+   shows the site's own page with a way back. With the site stopped behind the edge (or its 502 page simulated), the
+   app shows its cached page or native screen, never the edge's page.
+7. **4.2 evidence.** List the native features with the steps to see each one, for the review notes. Make sure the demo
    account has missions and shipments.
-7. **Login (iOS only).** Check whether the sign-in page shows Google or Telegram for this client. If it does, Sign in
+8. **Login (iOS only).** Check whether the sign-in page shows Google or Telegram for this client. If it does, Sign in
    with Apple must be present.
-8. **Store listings.** The screenshots come from the app (not a browser) and show no other platform. The texts tell a
+9. **Store listings.** The screenshots come from the app (not a browser) and show no other platform. The texts tell a
    story, as Echo's selling rules ask. The privacy URL, the support URL and the account deletion URL are filled in.
 
 ## Building iOS without a Mac
