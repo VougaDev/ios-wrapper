@@ -32,7 +32,7 @@ final class ShellUITests: XCTestCase {
         let app = launch("en")
         app.buttons["shell.panel.button"].tap()
         let text = app.staticTexts["shell.panel.text"]
-        let offline = NSPredicate(format: "label BEGINSWITH %@", "No connection")
+        let offline = NSPredicate(format: "label BEGINSWITH %@", "Offline:")
         expectation(for: offline, evaluatedWith: text)
         waitForExpectations(timeout: 30)
         XCTAssertEqual(app.buttons["shell.panel.button"].label, "Try again")

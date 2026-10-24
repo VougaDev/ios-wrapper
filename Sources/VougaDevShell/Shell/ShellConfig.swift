@@ -50,6 +50,21 @@ public struct ShellConfig {
     public var push: ShellPush.Settings?
     /// The purposes the site asks consent for; nil: no consent dialog.
     public var consent: ShellConsent.Settings?
+    /// A text every page of the site carries (Ship: `ship-bar`). A page of the main frame without it (a proxy's or CDN's
+    /// error page) is never shown: the app answers as with no network. Nil: only the edge's statuses are caught.
+    public var siteMarker: String?
+    /// The company's domains (`vougadev.com`): their pages and subdomains load in the app's one web view, never outside.
+    public var companyDomains: [String] = []
+    /// The origins whose pages get `window.VougaDevNative`: the site's and the account service's (for its sign-in), and
+    /// any other the app lists. Never an outside one.
+    public var trustedOrigins: [String] = []
+    /// The sign-in runs in the web view (the account service's page, finished with `completeSignIn` or its redirect);
+    /// false: in the system sign-in sheet, until the account service calls the shell.
+    public var signInInWebView = false
+    /// The app's Google client for iOS (`nativeSignIn("google")`); nil: Google sign-in is unavailable natively.
+    public var googleClientID: String?
+    /// Debug builds' UI tests only: every main-frame answer of the network counts as this status (502: the edge failed).
+    public var simulatedEdgeStatus: Int?
     /// Debug builds' UI tests only: the app behaves as with no network (every call fails as in airplane mode), with
     /// the site's real addresses, so the pages kept on the phone are the ones it shows.
     public var simulateOffline = false

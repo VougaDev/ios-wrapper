@@ -1,10 +1,10 @@
 import AuthenticationServices
 import UIKit
 
-/// SIGN-IN IN THE SYSTEM'S SIGN-IN SHEET (`ASWebAuthenticationSession`, "<App> wants to use the account service's site to sign
-/// in"), never in the web view: the authorization code flow with PKCE S256 for the app's public client, then the code
-/// exchange. The tokens go to the [SessionKeeper]. The sheet shares Safari's cookies (not ephemeral), so a person
-/// already signed in to VougaDev in Safari only confirms.
+/// THE APP'S SIGN-IN with the account service: the authorization code flow with PKCE S256 for the app's public client,
+/// then the code exchange; the tokens go to the [SessionKeeper]. The code arrives from the web view (the account
+/// service's page calls `completeSignIn`, or redirects to the app's address) or, as the fallback while the account
+/// service cannot finish it through the bridge, from the system sign-in sheet (`ASWebAuthenticationSession`).
 ///
 /// The ID token is not read: the app uses only the access token, as a bearer the site checks with the account service itself.
 @MainActor
@@ -25,14 +25,31 @@ final class BrowserSignIn: NSObject, ASWebAuthenticationPresentationContextProvi
 
     init(session: AppSession) { self.session = session }
 
-    func start(from window: UIWindow?) async -> Outcome {
-        guard running == nil else { return .cancelled }
-        guard let discovery = await session.discovery() else { return .offline }
+    /// The account service's authorization address for a new sign-in, with its PKCE request; nil when the account
+    /// service cannot be reached.
+    func prepare() async -> (url: URL, request: AuthorizeRequest)? {
+        guard let discovery = await session.discovery() else { return nil }
         let request = AuthorizeRequest()
         let locale = Locale.current.language.languageCode?.identifier ?? "en"
         guard let url = request.url(discovery: discovery, client: session.client, scopes: session.config.scopes, uiLocales: locale) else {
-            return .failed
+            return nil
         }
+        return (url, request)
+    }
+
+    /// The code the account service gave this sign-in, traded with its verifier for the app's tokens, then the site's session.
+    func exchange(code: String, request: AuthorizeRequest) async -> Outcome {
+        switch await session.endpoints.exchange(code: code, verifier: request.verifier) {
+        case let .tokens(access, refresh): return .done(await session.keeper.signedIn(accessToken: access, refreshToken: refresh))
+        case .refused: return .failed
+        case .unreachable: return .offline
+        }
+    }
+
+    /// The fallback while the account service cannot finish the sign-in through the bridge: the system sign-in sheet.
+    func start(from window: UIWindow?) async -> Outcome {
+        guard running == nil else { return .cancelled }
+        guard let (url, request) = await prepare() else { return .offline }
         anchor = window
         let callback: URL? = await withCheckedContinuation { done in
             var finished = false
@@ -51,11 +68,7 @@ final class BrowserSignIn: NSObject, ASWebAuthenticationPresentationContextProvi
         // A closed sheet answers no URL; any other error (none to tell apart for the person) is the same: sign in again.
         guard let callback else { return .cancelled }
         guard case let .code(code) = request.read(callback: callback, client: session.client) else { return .failed }
-        switch await session.endpoints.exchange(code: code, verifier: request.verifier) {
-        case let .tokens(access, refresh): return .done(await session.keeper.signedIn(accessToken: access, refreshToken: refresh))
-        case .refused: return .failed
-        case .unreachable: return .offline
-        }
+        return await exchange(code: code, request: request)
     }
 
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

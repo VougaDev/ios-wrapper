@@ -51,6 +51,25 @@ final class NotificationRouteTests: XCTestCase {
     }
 }
 
+final class EdgeAndSignInTests: XCTestCase {
+
+    func testTheEdgesFailuresAreNeverShown() {
+        for status in [502, 503, 504, 520, 522, 530] { XCTAssertTrue(ShellViewController.isEdgeError(status), "\(status)") }
+        for status in [200, 400, 403, 404, 500] { XCTAssertFalse(ShellViewController.isEdgeError(status), "\(status): the site's own page") }
+    }
+
+    func testGooglesSignInForAnIOSClient() {
+        XCTAssertEqual(NativeSignIn.googleScheme("1234-abcd.apps.googleusercontent.com"), "com.googleusercontent.apps.1234-abcd")
+        let request = AuthorizeRequest(state: "st", nonce: "no", verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
+        let url = NativeSignIn.googleAuthorizeURL(clientID: "1234-abcd.apps.googleusercontent.com", request: request, nonce: "page-nonce")!
+        let items = Dictionary(uniqueKeysWithValues: URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!.map { ($0.name, $0.value!) })
+        XCTAssertEqual(items["redirect_uri"], "com.googleusercontent.apps.1234-abcd:/oauth2redirect")
+        XCTAssertEqual(items["nonce"], "page-nonce")
+        XCTAssertEqual(items["code_challenge_method"], "S256")
+        XCTAssertEqual(url.host, "accounts.google.com")
+    }
+}
+
 @MainActor
 final class OfflinePagesTests: XCTestCase {
 

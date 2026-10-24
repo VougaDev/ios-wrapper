@@ -1,3 +1,4 @@
+import SafariServices
 import UIKit
 import WebKit
 
@@ -24,6 +25,13 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     public private(set) var webView: WKWebView!
     private lazy var panel = ShellPanel(colors: session.config.colors, titleFont: session.config.titleFont)
     private lazy var browser = BrowserSignIn(session: session)
+    private lazy var nativeSignIn = NativeSignIn(googleClientID: session.config.googleClientID, transport: session.transport)
+    /// The origins whose pages get the bridge: the site's, the account service's, and those the app lists.
+    private lazy var trusted: [AppOrigin] = [origin, auth] + session.config.trustedOrigins.map(AppOrigin.init)
+    /// The sign-in running in the web view: its PKCE request, until the account service hands the code back.
+    private var pendingSignIn: AuthorizeRequest?
+    /// The MIME type of the last main-frame answer: only an HTML page is checked for the site's marker.
+    private var mainMIME: String?
     private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlineMissing, offlineWelcome, askPush }
 
     private var screen: Screen?
@@ -197,8 +205,8 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// any other origin) and the reply handler, which checks the sending frame itself ([NativeBridge]).
     private func installNativeBridge(_ controller: WKUserContentController) {
         let methods = bridgeMethods()
-        let bridge = NativeBridge(origin: origin, methods: Dictionary(methods, uniquingKeysWith: { first, _ in first }))
-        let script = NativeShim.script(origin: origin, version: session.config.versionName, features: session.features,
+        let bridge = NativeBridge(origins: trusted, methods: Dictionary(methods, uniquingKeysWith: { first, _ in first }))
+        let script = NativeShim.script(origins: trusted, version: session.config.versionName, features: session.features,
                                        methods: methods.map { $0.0 })
         controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         controller.addScriptMessageHandler(BridgeHandler(bridge), contentWorld: .page, name: NativeShim.handler)
@@ -228,6 +236,18 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         guard let url = action.request.url else { return decisionHandler(.cancel) }
         // Frames inside a page navigate within themselves; only the top level (or a new window) is policed.
         if let frame = action.targetFrame, !frame.isMainFrame { return decisionHandler(.allow) }
+        // The account service's answer to a sign-in in the web view: its redirect to the app's own address.
+        if pendingSignIn != nil, url.absoluteString.hasPrefix(session.config.redirectURI) {
+            decisionHandler(.cancel)
+            let request = pendingSignIn
+            if case let .code(code) = request?.read(callback: url, client: session.client) {
+                Task { _ = await completeWebSignIn(code: code, state: request?.state) }
+            } else {
+                pendingSignIn = nil
+                show(.failed)
+            }
+            return
+        }
         let isSite = origin.matches(url)
         let path = routePath(url)
         if SignInRoute.isSignOut(method: action.request.httpMethod, isSite: isSite, path: path) {
@@ -235,8 +255,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             return signOut()
         }
         let screen = isSite ? path.flatMap { nativeScreen(path: $0) } : nil
-        switch LinkPolicy.decide(scheme: url.scheme, isSite: isSite, isAuth: auth.matches(url), isNativeRoute: screen != nil, path: path,
-                                  authSignInPaths: session.config.authSignInPaths) {
+        let isCompany = LinkPolicy.isCompany(host: url.host, domains: session.config.companyDomains)
+        switch LinkPolicy.decide(scheme: url.scheme, isSite: isSite, isAuth: auth.matches(url), isCompany: isCompany,
+                                  isNativeRoute: screen != nil, path: path, authSignInPaths: session.config.authSignInPaths,
+                                  signInInWebView: session.config.signInInWebView) {
         case .loadInside:
             // The UI tests' "no network": a page of the network is never loaded, as in airplane mode.
             if session.config.simulateOffline && !loadingKept {
@@ -260,6 +282,13 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             // Back from the native screen lands on a page of the site, never on the account service's callback that redirected here.
             if !origin.matches(webView.url) { webView.load(URLRequest(url: URL(string: home)!)) }
             if let screen { present(screen, animated: true) }
+        case .openSheet:
+            // An outside company's site: an in-app sheet over the app, which closes back to it.
+            decisionHandler(.cancel)
+            let sheet = SFSafariViewController(url: url)
+            sheet.preferredControlTintColor = session.config.colors.accent
+            sheet.dismissButtonStyle = .done
+            presenter.present(sheet, animated: true)
         case .openOutside:
             decisionHandler(.cancel)
             openOutside(url)
@@ -270,7 +299,21 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
                         decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        if navigationResponse.isForMainFrame { mainStatus = (navigationResponse.response as? HTTPURLResponse)?.statusCode }
+        guard navigationResponse.isForMainFrame else { return decisionHandler(.allow) }
+        let response = navigationResponse.response
+        mainMIME = response.mimeType
+        mainStatus = (response as? HTTPURLResponse)?.statusCode
+        // NEVER A RAW ERROR PAGE: the edge's or a CDN's failure on a company page is answered as with no network.
+        let company = response.url.map { url in
+            trusted.contains { $0.matches(url) } || LinkPolicy.isCompany(host: url.host, domains: session.config.companyDomains)
+        } ?? false
+        if company, !loadingKept {
+            if let simulated = session.config.simulatedEdgeStatus { mainStatus = simulated }
+            if let status = mainStatus, Self.isEdgeError(status) {
+                decisionHandler(.cancel)
+                return offlineFallback(response.url)
+            }
+        }
         decisionHandler(.allow)
     }
 
@@ -286,10 +329,28 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
+    /// The statuses an edge or a CDN answers with when the site could not: 502, 503, 504, and a CDN's own 520–530.
+    nonisolated static func isEdgeError(_ status: Int) -> Bool { [502, 503, 504].contains(status) || (520...530).contains(status) }
+
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         webView.scrollView.refreshControl?.endRefreshing()
         notifyNetwork()
         guard origin.matches(webView.url) else { return }
+        // A page of the site's origin without its marker is not the site's (a proxy's error page): never shown.
+        if showingKept == nil, let marker = session.config.siteMarker, mainMIME == "text/html" {
+            let url = webView.url
+            let check = "document.documentElement.outerHTML.indexOf(\(NativeShim.quote(marker))) >= 0"
+            webView.evaluateJavaScript(check) { [weak self] found, _ in
+                guard let self else { return }
+                if (found as? Bool) == false { return self.offlineFallback(url) }
+                self.siteFinished(webView)
+            }
+            return
+        }
+        siteFinished(webView)
+    }
+
+    private func siteFinished(_ webView: WKWebView) {
         // A page of the site from the network, answered 200: kept for when there is no network.
         if showingKept == nil, mainStatus == 200, let url = webView.url, routePath(url)?.hasPrefix("/auth/") == false {
             Task { await session.offlinePages.save(webView, url: url) }
@@ -448,7 +509,8 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                        button: Strings.text("shell_load_error_retry"), image: mark, brand: true, rows: rows)
         case .offlineMissing:
             panel.show(title: Strings.text("shell_offline_missing_title"), text: Strings.text("shell_offline_missing_text"),
-                       button: Strings.text("shell_load_error_retry"), image: UIImage(systemName: "wifi.slash"), rows: keptRows())
+                       button: Strings.text("shell_load_error_retry"), link: Strings.text("shell_back"),
+                       image: UIImage(systemName: "wifi.slash"), rows: keptRows())
         case .offlineWelcome:
             panel.show(title: name, text: Strings.text("shell_offline_welcome"), button: nil, image: mark, brand: true, busy: false)
         case .askPush:
@@ -490,7 +552,15 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     }
 
     private func onPanelLink() {
-        if screen == .askPush {
+        if screen == .offlineMissing {
+            // Back to what was shown before, or the newest page kept.
+            if webView.canGoBack, webView.url != nil {
+                hidePanel()
+                webView.goBack()
+            } else if let last = session.offlinePages.entries.first {
+                showKept(last)
+            }
+        } else if screen == .askPush {
             session.push?.markAsked()
             openAfterSignIn()
         } else {
@@ -522,10 +592,21 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
-    /// One button: the account service's sign-in sheet; with no network, the sign-in says so (and offers what is kept).
+    /// One button: the account service's sign-in, in the web view (finished by `completeSignIn` or the redirect), or in
+    /// the system sheet until the account service calls the shell; with no network, the sign-in says so (and offers what
+    /// is kept).
     private func startBrowserSignIn() {
         guard network.online else { return show(.offlineSignIn) }
         show(.working)
+        if session.config.signInInWebView {
+            Task {
+                guard let (url, request) = await browser.prepare() else { return show(.offlineSignIn) }
+                pendingSignIn = request
+                hidePanel()
+                webView.load(URLRequest(url: url))
+            }
+            return
+        }
         Task {
             switch await browser.start(from: view.window) {
             case .cancelled: show(.signIn)
@@ -538,6 +619,33 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 case .signIn: show(.failed)
                 }
             }
+        }
+    }
+
+    /// The account service's code for the sign-in running in the web view, by `completeSignIn` or its redirect.
+    private func completeWebSignIn(code: String?, state: String?) async -> JSONObject {
+        guard let request = pendingSignIn, let code, !code.isEmpty, state == request.state else { return NativeBridge.refused("invalid_state") }
+        pendingSignIn = nil
+        show(.working)
+        switch await browser.exchange(code: code, request: request) {
+        case let .done(renewal):
+            switch renewal {
+            case .renewed:
+                sessionOpen(newSignIn: true)
+                return NativeBridge.ok()
+            case .offline:
+                show(.offlineSignIn)
+                return NativeBridge.refused("offline")
+            case .signIn:
+                show(.failed)
+                return NativeBridge.refused("exchange_refused")
+            }
+        case .offline:
+            show(.offlineSignIn)
+            return NativeBridge.refused("offline")
+        case .cancelled, .failed:
+            show(.failed)
+            return NativeBridge.refused("exchange_refused")
         }
     }
 
@@ -614,6 +722,14 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
                 self.openSettings()
                 answer(NativeBridge.ok())
+            }),
+            ("completeSignIn", { [weak self] args, answer in
+                guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
+                Task { answer(await self.completeWebSignIn(code: args?["code"] as? String, state: args?["state"] as? String)) }
+            }),
+            ("nativeSignIn", { [weak self] args, answer in
+                guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
+                self.nativeSignIn.start(args, window: self.view.window, answer: answer)
             }),
             ("network", { [weak self] _, answer in
                 answer(self?.networkState() ?? ["online": true, "offlinePage": false, "savedAt": NSNull()])

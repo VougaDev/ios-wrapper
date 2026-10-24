@@ -30,17 +30,26 @@ final class OriginAndPolicyTests: XCTestCase {
     }
 
     func testLinkPolicyTable() {
-        func decide(_ scheme: String?, site: Bool = false, auth: Bool = false, native: Bool = false, path: String? = nil) -> LinkPolicy.Decision {
-            LinkPolicy.decide(scheme: scheme, isSite: site, isAuth: auth, isNativeRoute: native, path: path, authSignInPaths: ["/authorize", "/login"])
+        func decide(_ scheme: String?, site: Bool = false, auth: Bool = false, company: Bool = false, native: Bool = false, path: String? = nil) -> LinkPolicy.Decision {
+            LinkPolicy.decide(scheme: scheme, isSite: site, isAuth: auth, isCompany: company, isNativeRoute: native, path: path,
+                              authSignInPaths: ["/authorize", "/login"])
         }
         XCTAssertEqual(decide("https", site: true, path: "/"), .loadInside)
         XCTAssertEqual(decide("https", site: true, path: "/auth/login/"), .signIn)
         XCTAssertEqual(decide("https", site: true, path: "/auth/login"), .signIn)
         XCTAssertEqual(decide("https", auth: true, path: "/authorize/"), .signIn)
         XCTAssertEqual(decide("https", auth: true, path: "/login/?next=x"), .signIn)
-        XCTAssertEqual(decide("https", auth: true, path: "/account/delete/"), .openOutside)
+        XCTAssertEqual(decide("https", auth: true, path: "/account/delete/"), .loadInside, "the account service's pages: inside")
+        XCTAssertEqual(decide("https", company: true, path: "/terms/"), .loadInside, "a company domain: inside")
+        XCTAssertEqual(LinkPolicy.decide(scheme: "https", isSite: false, isAuth: true, isNativeRoute: false, path: "/login/",
+                                         authSignInPaths: ["/login"], signInInWebView: true), .loadInside, "the sign-in in the web view")
         XCTAssertEqual(decide("https", site: true, native: true, path: "/courier/missions/"), .openNative)
-        XCTAssertEqual(decide("https", path: "/"), .openOutside)
+        XCTAssertEqual(decide("https", path: "/"), .openSheet, "an outside company's site: an in-app sheet")
+        XCTAssertEqual(decide("mailto"), .openOutside)
+        XCTAssertTrue(LinkPolicy.isCompany(host: "pay.example.org", domains: ["example.org"]))
+        XCTAssertTrue(LinkPolicy.isCompany(host: "EXAMPLE.org", domains: ["example.org"]))
+        XCTAssertFalse(LinkPolicy.isCompany(host: "evilexample.org", domains: ["example.org"]))
+        XCTAssertFalse(LinkPolicy.isCompany(host: "example.org.evil.io", domains: ["example.org"]))
         XCTAssertEqual(decide("tel"), .openOutside)
         XCTAssertEqual(decide("intent"), .openIntent)
         XCTAssertEqual(decide("javascript"), .block)

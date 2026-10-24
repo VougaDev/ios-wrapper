@@ -20,18 +20,19 @@ public final class NativeBridge {
     public static let unknownMethod = "unknown_method"
     public static let invalidJSON = "invalid_json"
 
-    let origin: AppOrigin
+    let origins: [AppOrigin]
     let methods: [String: Method]
 
-    public init(origin: AppOrigin, methods: [String: Method]) {
-        self.origin = origin
+    /// [origins]: the trusted origins whose main frames may call (the site's, the account service's for its sign-in).
+    public init(origins: [AppOrigin], methods: [String: Method]) {
+        self.origins = origins
         self.methods = methods
     }
 
     /// [body] is the message's body; [scheme], [host], [port] are the sending frame's security origin.
     public func onMessage(_ body: Any, isMainFrame: Bool, scheme: String?, host: String?, port: Int, reply: @escaping (String) -> Void) {
         let once = Once(reply)
-        guard isMainFrame, origin.matchesParts(scheme: scheme, host: host, port: port) else {
+        guard isMainFrame, origins.contains(where: { $0.matchesParts(scheme: scheme, host: host, port: port) }) else {
             return once.send(Self.refused(Self.refusedOrigin))
         }
         guard let text = body as? String, let data = text.data(using: .utf8),
@@ -41,7 +42,10 @@ public final class NativeBridge {
         guard let name = envelope["method"] as? String, let method = methods[name] else {
             return once.send(Self.refused(Self.unknownMethod))
         }
-        method(envelope["args"] as? JSONObject) { once.send($0) }
+        // An object is the arguments; a single value (`nativeSignIn("google")`) comes as `{"value": …}`.
+        let raw = envelope["args"]
+        let args = raw as? JSONObject ?? ((raw == nil || raw is NSNull) ? nil : ["value": raw!])
+        method(args) { once.send($0) }
     }
 
     public static func ok() -> JSONObject { ["ok": true] }

@@ -1,11 +1,11 @@
 /* Les écrans de la coque. Une application peut reformuler chacun d'eux dans son propre Shell.strings. */
 "shell_load_error_retry" = "Réessayer";
-"shell_no_app_for_link" = "Aucune application de ce téléphone ne peut ouvrir ce lien.";
+"shell_no_app_for_link" = "Aucune application de ce téléphone ne permet de l'ouvrir.";
 "shell_signin_text" = "Connectez-vous avec votre compte VougaDev pour continuer.";
 "shell_signin_button" = "Se connecter avec VougaDev";
 "shell_signin_working" = "Ouverture de votre session…";
 "shell_signin_failed" = "La connexion n'a pas pu aboutir. Veuillez réessayer.";
-"shell_signin_offline" = "Aucune connexion : votre session n'a pas pu être ouverte. Veuillez vérifier le réseau et réessayer.";
+"shell_signin_offline" = "Hors connexion : votre session n'a pas pu être ouverte. Veuillez vérifier le réseau et réessayer.";
 "shell_signing_out" = "Déconnexion en cours…";
 "shell_privacy" = "Politique de confidentialité";
 "shell_ok" = "OK";
@@ -18,7 +18,7 @@
 
 /* Le consentement. */
 "consent_title" = "Cookies et données";
-"consent_text" = "Avec votre accord, le site utilise aussi :";
+"consent_text" = "Avec votre accord, l'application utilise aussi :";
 "consent_accept" = "J'accepte";
 "consent_refuse" = "Le nécessaire seulement";
 
@@ -40,9 +40,10 @@
 "settings_sign_out_confirm" = "Se déconnecter de %@ sur ce téléphone ?";
 
 /* No network: the pages kept on the phone. */
-"shell_offline_bar" = "Hors ligne · mis à jour à %@";
-"shell_offline_missing_title" = "Pas encore disponible hors ligne";
-"shell_offline_missing_text" = "Cette page n'a pas encore été ouverte sur ce téléphone. Ces pages sont conservées et disponibles sans connexion :";
-"shell_offline_welcome" = "Connectez-vous à Internet une première fois pour commencer. Les pages que vous ouvrez sont ensuite conservées sur ce téléphone et restent disponibles sans connexion.";
-"shell_signin_offline_kept" = "Aucune connexion : la connexion à votre compte sera possible dès le retour du réseau. En attendant, ces pages sont conservées sur ce téléphone :";
-"shell_offline_home" = "Page d'accueil";
+"shell_offline_bar" = "Hors connexion · mis à jour à %@";
+"shell_offline_missing_title" = "Pas encore enregistré sur ce téléphone";
+"shell_offline_missing_text" = "Cet écran n'a pas encore été ouvert sur ce téléphone. Ceux-ci restent disponibles hors connexion :";
+"shell_offline_welcome" = "Connectez-vous à Internet une première fois pour commencer. Ce que vous consultez reste ensuite disponible sur ce téléphone, même hors connexion.";
+"shell_signin_offline_kept" = "Hors connexion : la connexion à votre compte sera possible dès le retour du réseau. En attendant, ces écrans restent disponibles :";
+"shell_offline_home" = "Accueil";
+"shell_back" = "Retour";

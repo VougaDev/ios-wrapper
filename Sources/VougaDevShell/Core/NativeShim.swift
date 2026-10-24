@@ -36,17 +36,19 @@ public enum NativeShim {
 
     /// [version] is the app's version name and [origin] its origin, both written as JSON string literals so they cannot
     /// break out of them; [methods] are the app's members, in the order its contract lists them (plain identifiers only).
-    public static func script(origin: AppOrigin, version: String, features: [String], methods: [String]) -> String {
+    /// [origins]: the trusted origins (the site's first); on any other the script does nothing.
+    public static func script(origins: [AppOrigin], version: String, features: [String], methods: [String]) -> String {
         precondition(
             methods.allSatisfy(isMethodName) && methods.allSatisfy { !builtIn.contains($0) } && Set(methods).count == methods.count,
             "Bridge members must be distinct identifiers other than \(builtIn): \(methods)"
         )
         let featureList = "[" + features.map(quote).joined(separator: ", ") + "]"
+        let originList = "[" + origins.map { quote($0.originString) }.joined(separator: ", ") + "]"
         let members = methods.map { ",\n    \($0): function (args) { return call(\"\($0)\", args); }" }.joined()
         return """
         (function () {
           "use strict";
-          if (window.location.origin !== \(quote(origin.originString))) { return; }
+          if (\(originList).indexOf(window.location.origin) < 0) { return; }
           if (window.\(name)) { return; }
           var handlers = window.webkit && window.webkit.messageHandlers;
           var h = handlers ? handlers.\(handler) : null;

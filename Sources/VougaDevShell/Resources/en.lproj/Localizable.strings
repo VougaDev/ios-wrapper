@@ -1,11 +1,11 @@
 /* The shell's screens. An app rewords any of them in its own Shell.strings (the sign-in sentence, above all). */
 "shell_load_error_retry" = "Try again";
-"shell_no_app_for_link" = "No application on this phone can open this link.";
+"shell_no_app_for_link" = "No application on this phone can open it.";
 "shell_signin_text" = "Sign in with your VougaDev account to continue.";
 "shell_signin_button" = "Sign in with VougaDev";
 "shell_signin_working" = "Opening your session…";
 "shell_signin_failed" = "The sign-in could not be completed. Please try again.";
-"shell_signin_offline" = "No connection: your session could not be opened. Please check the network and try again.";
+"shell_signin_offline" = "Offline: your session could not be opened. Please check the network and try again.";
 "shell_signing_out" = "Signing out…";
 "shell_privacy" = "Privacy policy";
 "shell_ok" = "OK";
@@ -18,7 +18,7 @@
 
 /* The consent dialog. */
 "consent_title" = "Cookies and data";
-"consent_text" = "With your agreement, the site also uses:";
+"consent_text" = "With your agreement, the app also uses:";
 "consent_accept" = "I agree";
 "consent_refuse" = "Only what is needed";
 
@@ -41,8 +41,9 @@
 
 /* No network: the pages kept on the phone. */
 "shell_offline_bar" = "Offline · updated at %@";
-"shell_offline_missing_title" = "Not yet available offline";
-"shell_offline_missing_text" = "This page has not been opened on this phone yet. These pages are kept and available without a connection:";
-"shell_offline_welcome" = "Connect to the Internet once to start. The pages you open are then kept on this phone and remain available without a connection.";
-"shell_signin_offline_kept" = "No connection: signing in will be possible as soon as the network returns. In the meantime, these pages are kept on this phone:";
-"shell_offline_home" = "Home page";
+"shell_offline_missing_title" = "Not yet saved on this phone";
+"shell_offline_missing_text" = "This screen has not been opened on this phone yet. These remain available offline:";
+"shell_offline_welcome" = "Connect to the Internet once to start. What you view then stays available on this phone, even offline.";
+"shell_signin_offline_kept" = "Offline: signing in will be possible as soon as the network returns. In the meantime, these screens remain available:";
+"shell_offline_home" = "Home";
+"shell_back" = "Back";

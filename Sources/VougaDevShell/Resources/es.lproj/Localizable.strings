@@ -1,6 +1,6 @@
 /* Las pantallas del contenedor. Una aplicación puede reformular cualquiera de ellas en su propio Shell.strings. */
 "shell_load_error_retry" = "Reintentar";
-"shell_no_app_for_link" = "Ninguna aplicación de este teléfono puede abrir este enlace.";
+"shell_no_app_for_link" = "Ninguna aplicación de este teléfono puede abrirlo.";
 "shell_signin_text" = "Inicie sesión con su cuenta VougaDev para continuar.";
 "shell_signin_button" = "Iniciar sesión con VougaDev";
 "shell_signin_working" = "Abriendo su sesión…";
@@ -18,7 +18,7 @@
 
 /* El consentimiento. */
 "consent_title" = "Cookies y datos";
-"consent_text" = "Con su acuerdo, el sitio también utiliza:";
+"consent_text" = "Con su acuerdo, la aplicación también utiliza:";
 "consent_accept" = "Acepto";
 "consent_refuse" = "Solo lo necesario";
 
@@ -41,8 +41,9 @@
 
 /* No network: the pages kept on the phone. */
 "shell_offline_bar" = "Sin conexión · actualizado a las %@";
-"shell_offline_missing_title" = "Aún no disponible sin conexión";
-"shell_offline_missing_text" = "Esta página aún no se ha abierto en este teléfono. Estas páginas están guardadas y disponibles sin conexión:";
-"shell_offline_welcome" = "Conéctese a Internet una primera vez para empezar. Las páginas que abra se guardan después en este teléfono y siguen disponibles sin conexión.";
-"shell_signin_offline_kept" = "Sin conexión: podrá iniciar sesión en cuanto vuelva la red. Mientras tanto, estas páginas están guardadas en este teléfono:";
-"shell_offline_home" = "Página de inicio";
+"shell_offline_missing_title" = "Aún no guardado en este teléfono";
+"shell_offline_missing_text" = "Esta pantalla aún no se ha abierto en este teléfono. Estas siguen disponibles sin conexión:";
+"shell_offline_welcome" = "Conéctese a Internet una primera vez para empezar. Lo que consulte seguirá disponible en este teléfono, incluso sin conexión.";
+"shell_signin_offline_kept" = "Sin conexión: podrá iniciar sesión en cuanto vuelva la red. Mientras tanto, estas pantallas siguen disponibles:";
+"shell_offline_home" = "Inicio";
+"shell_back" = "Atrás";
