@@ -31,3 +31,7 @@ The same on Android and iOS; a page branches on the platform only through `platf
   reachable inside the app. A disclosure before background location.
 
 Work in progress: the code moves here from Ship's app, where it runs in production today.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
