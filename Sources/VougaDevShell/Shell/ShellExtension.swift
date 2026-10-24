@@ -82,6 +82,7 @@ public struct ShellSettingsEntry {
 }
 
 public extension ShellExtension {
+    func bridgeMethods(host: ShellHost) -> [(String, NativeBridge.Method)] { [] }
     var requirements: ShellRequirements { ShellRequirements() }
     func attach(to session: AppSession) {}
     func configure(_ configuration: WKWebViewConfiguration) {}
