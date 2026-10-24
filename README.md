@@ -42,6 +42,7 @@ The same on Android and iOS; a page branches on the platform only through `platf
 | Sign-out | The web's `POST /auth/logout/` is taken over: the site's session ended, the refresh token revoked, cookies and web data cleared, tracking stopped. The VougaDev session in Safari stays (no `end_session`). |
 | Links | The app's pages inside; its sign-in pages run the native sign-in; the account service's account pages, other sites, `tel:`, `mailto:`, maps open outside; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. A same-origin path may open a native screen instead ([`nativeScreen(path:)`](Sources/VougaDevShell/Shell/ShellViewController.swift)). |
 | Offline | A native screen (title, sentence, Try again) instead of a browser error, at launch too. |
+| Before sign-in | The sign-in screen links the site's privacy page (`privacyPath`, `/privacy/` by default; App Review 5.1.1). From there a visitor reads the site's public pages; their sign-in links come back to the native sign-in. |
 | Tracking (`.tracking`) | The disclosure first ([`TrackingDisclosure`](Sources/VougaDevShell/Tracking/TrackingStore.swift)), then Location Services, then While-Using permission (precise asked once more when only approximate is given). Positions are posted every `intervalSeconds` (15…300) to `/api/v1/courier/missions/<id>/position` with `{lat, lon, accuracy_m, fix_at_ms, distance_m}` as the web view's session, in the background too with the location indicator shown; never "Always". Stops on 404 or `not_on_the_road` / `not_started` / `not_your_mission` (after asking `/api/v1/courier/tracking` once for the next mission), on sign-out, on `stopTracking()` and after six hours. Resumed when the app comes back with a mission kept. |
 | Missions (`.missions`) | `openMissions` opens `/courier/missions/…` on the app's native screen when it has one, else in the web view. |
 | Pages | JavaScript `alert`/`confirm` as native alerts; camera and microphone streams refused; a crashed page process reloaded; swipe back; pull to refresh. |
@@ -101,8 +102,11 @@ xcodebuild test -scheme VougaDevShell -destination 'platform=iOS Simulator,name=
 brew install xcodegen && cd Example && xcodegen && open VougaDevExample.xcodeproj
 ```
 
-[`.github/workflows/ios.yml`](.github/workflows/ios.yml) runs the unit tests on a `macos-15` runner, builds the example
-app for the Simulator and checks the texts for other platforms' names, on every push. It needs no secret.
+[`.github/workflows/ios.yml`](.github/workflows/ios.yml) runs the unit tests on a `macos-15` runner, then the example
+app's UI tests ([Example/UITests](Example/UITests): the sign-in screen in en, fr and es, the system sign-in sheet, the
+offline screen) with their screenshots as an artifact, and checks the texts for other platforms' names, on every push.
+It needs no secret. UI tests find the shell's screen by its accessibility identifiers: `shell.panel.title`,
+`shell.panel.text`, `shell.panel.button`, `shell.panel.link`.
 
 ## TestFlight, once VougaDev is enrolled
 

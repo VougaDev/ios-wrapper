@@ -79,6 +79,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         panel.translatesAutoresizingMaskIntoConstraints = false
         panel.isHidden = true
         panel.onButton = { [weak self] in self?.onPanelButton() }
+        panel.onLink = { [weak self] in self?.openPrivacy() }
         view.addSubview(panel)
         NSLayoutConstraint.activate([
             panel.topAnchor.constraint(equalTo: view.topAnchor),
@@ -299,13 +300,23 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         switch next {
         case .working: panel.show(title: name, text: Strings.text("shell_signin_working"), button: nil)
         case .signingOut: panel.show(title: name, text: Strings.text("shell_signing_out"), button: nil)
-        case .signIn: panel.show(title: name, text: Strings.text("shell_signin_text"), button: Strings.text("shell_signin_button"))
-        case .failed: panel.show(title: name, text: Strings.text("shell_signin_failed"), button: Strings.text("shell_signin_button"))
+        case .signIn: panel.show(title: name, text: Strings.text("shell_signin_text"), button: Strings.text("shell_signin_button"), link: privacyLink)
+        case .failed: panel.show(title: name, text: Strings.text("shell_signin_failed"), button: Strings.text("shell_signin_button"), link: privacyLink)
         case .offlineSignIn: panel.show(title: name, text: Strings.text("shell_signin_offline"), button: Strings.text("shell_load_error_retry"))
         case .offlinePage:
             panel.show(title: Strings.text("shell_load_error_title"), text: Strings.text("shell_load_error_text"),
                        button: Strings.text("shell_load_error_retry"))
         }
+    }
+
+    /// The privacy policy is a tap away before signing in too (App Review 5.1.1): the site's page, inside the app. From
+    /// there a visitor reads the site's public pages; its sign-in links come back to the native sign-in.
+    private var privacyLink: String? { session.config.privacyPath == nil ? nil : Strings.text("shell_privacy") }
+
+    private func openPrivacy() {
+        guard let url = origin.pageURL(session.config.privacyPath) else { return }
+        hidePanel()
+        open(url)
     }
 
     private func hidePanel() {

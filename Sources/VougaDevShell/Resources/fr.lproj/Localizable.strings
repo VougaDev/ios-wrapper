@@ -9,6 +9,7 @@
 "shell_signin_failed" = "La connexion n'a pas pu aboutir. Veuillez réessayer.";
 "shell_signin_offline" = "Aucune connexion : votre session n'a pas pu être ouverte. Veuillez vérifier le réseau et réessayer.";
 "shell_signing_out" = "Déconnexion en cours…";
+"shell_privacy" = "Politique de confidentialité";
 "shell_ok" = "OK";
 "shell_cancel" = "Annuler";
 

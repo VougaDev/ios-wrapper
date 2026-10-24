@@ -48,6 +48,19 @@ targets:
         SWIFT_VERSION: "5.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""      # APP: VougaDev's team id, once enrolled (README.md, "TestFlight")
+  VougaDevExampleUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: VougaDevExample
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.vougadev.example.uitests
+        TEST_TARGET_NAME: VougaDevExample
+        SWIFT_VERSION: "5.0"
 schemes:
   VougaDevExample:
     build:
@@ -55,3 +68,5 @@ schemes:
         VougaDevExample: all
     test:
       config: Debug
+      targets:
+        - VougaDevExampleUITests

@@ -45,6 +45,8 @@ public struct ShellConfig {
     public var features: Set<ShellFeature>
     public var colors: ShellColors
     public var scopes: String
+    /// The site's privacy page, linked from the sign-in screen (App Review 5.1.1); nil shows no link.
+    public var privacyPath: String?
     /// Safari's Web Inspector may attach to the web view (debug builds only).
     public var inspectable: Bool
 
@@ -54,7 +56,7 @@ public struct ShellConfig {
     public init(baseURL: String, authBaseURL: String, authClientID: String, userAgentToken: String,
                 features: Set<ShellFeature> = [], colors: ShellColors = ShellColors(),
                 redirectURI: String? = nil, storeName: String? = nil, versionName: String? = nil,
-                scopes: String = ShellConfig.defaultScopes, inspectable: Bool = false) {
+                scopes: String = ShellConfig.defaultScopes, privacyPath: String? = "/privacy/", inspectable: Bool = false) {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.vougadev.app"
         self.baseURL = baseURL
         self.authBaseURL = authBaseURL
@@ -66,6 +68,7 @@ public struct ShellConfig {
         self.storeName = storeName ?? bundleID
         self.versionName = versionName ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0")
         self.scopes = scopes
+        self.privacyPath = privacyPath
         self.inspectable = inspectable
     }
 }

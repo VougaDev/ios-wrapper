@@ -29,14 +29,27 @@ jobs:
           xcodebuild test -scheme VougaDevShell -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -resultBundlePath build/tests.xcresult | tee build-tests.log | grep -E "error:|warning:|Test Case|Executed|\*\* TEST" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" build-tests.log
-      - name: Example app for the Simulator
+      - name: Example app and its UI tests on the Simulator
         run: |
           set -o pipefail
           brew install xcodegen
           cd Example && xcodegen
-          xcodebuild build -project VougaDevExample.xcodeproj -scheme VougaDevExample \
-            -destination "platform=iOS Simulator,id=$SIMULATOR" CODE_SIGNING_ALLOWED=NO | tee ../build-app.log | grep -E "error:|warning:|\*\* BUILD" || true
-          grep -q "\*\* BUILD SUCCEEDED \*\*" ../build-app.log
+          xcodebuild build-for-testing -project VougaDevExample.xcodeproj -scheme VougaDevExample \
+            -destination "platform=iOS Simulator,id=$SIMULATOR" -derivedDataPath ../build/dd CODE_SIGNING_ALLOWED=NO \
+            | tee ../build-app.log | grep -E "error:|warning:|\*\* TEST BUILD" || true
+          grep -q "\*\* TEST BUILD SUCCEEDED \*\*" ../build-app.log
+          xcodebuild test-without-building -project VougaDevExample.xcodeproj -scheme VougaDevExample \
+            -destination "platform=iOS Simulator,id=$SIMULATOR" -derivedDataPath ../build/dd \
+            -resultBundlePath ../build/ui.xcresult TEST_RUNNER_SCREENSHOTS_DIR="$GITHUB_WORKSPACE/screenshots" \
+            | tee ../build-ui.log | grep -E "error:|Test Case|Executed|\*\* TEST" || true
+          grep -q "\*\* TEST EXECUTE SUCCEEDED \*\*" ../build-ui.log
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: warn
       - name: No other platform named in the app's texts (App Review 2.3.10)
         run: |
           if grep -rniE "android|google play|play store|\.apk" Sources/VougaDevShell/Resources Example/App Example/project.yml; then exit 1; fi
@@ -48,5 +61,7 @@ jobs:
           path: |
             build-tests.log
             build-app.log
+            build-ui.log
             build/tests.xcresult
+            build/ui.xcresult
           if-no-files-found: ignore

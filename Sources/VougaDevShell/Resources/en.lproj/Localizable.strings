@@ -9,6 +9,7 @@
 "shell_signin_failed" = "The sign-in could not be completed. Please try again.";
 "shell_signin_offline" = "No connection: your session could not be opened. Please check the network and try again.";
 "shell_signing_out" = "Signing out…";
+"shell_privacy" = "Privacy policy";
 "shell_ok" = "OK";
 "shell_cancel" = "Cancel";
 

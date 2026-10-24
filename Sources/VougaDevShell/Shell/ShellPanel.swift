@@ -9,7 +9,9 @@ final class ShellPanel: UIView {
     private let text = UILabel()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let button = UIButton(configuration: .filled())
+    private let link = UIButton(configuration: .plain())
     var onButton: (() -> Void)?
+    var onLink: (() -> Void)?
 
     init(colors: ShellColors) {
         super.init(frame: .zero)
@@ -32,8 +34,19 @@ final class ShellPanel: UIView {
         button.titleLabel?.adjustsFontForContentSizeCategory = true
         button.addAction(UIAction { [weak self] _ in self?.onButton?() }, for: .primaryActionTriggered)
         button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        var quiet = UIButton.Configuration.plain()
+        quiet.baseForegroundColor = colors.muted
+        link.configuration = quiet
+        link.titleLabel?.adjustsFontForContentSizeCategory = true
+        link.addAction(UIAction { [weak self] _ in self?.onLink?() }, for: .primaryActionTriggered)
+        link.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        // What UI tests find the panel by, in any language.
+        title.accessibilityIdentifier = "shell.panel.title"
+        text.accessibilityIdentifier = "shell.panel.text"
+        button.accessibilityIdentifier = "shell.panel.button"
+        link.accessibilityIdentifier = "shell.panel.link"
 
-        let stack = UIStackView(arrangedSubviews: [title, text, spinner, button])
+        let stack = UIStackView(arrangedSubviews: [title, text, spinner, button, link])
         stack.axis = .vertical
         stack.spacing = 20
         stack.alignment = .fill
@@ -56,8 +69,10 @@ final class ShellPanel: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Built in code") }
 
-    /// [button] nil shows the spinner instead: work under way.
-    func show(title: String, text: String, button: String?) {
+    /// [button] nil shows the spinner instead: work under way. [link] is the quiet line under the button, or none.
+    func show(title: String, text: String, button: String?, link: String? = nil) {
+        self.link.isHidden = link == nil
+        self.link.configuration?.title = link
         self.title.text = title
         self.text.text = text
         self.button.isHidden = button == nil
