@@ -52,20 +52,21 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 
   Texts that leave the app (an SMS or e-mail carrying a URL) may say "lien" or "page": they are read in another app.
   Native strings come from the app's catalogue in en, fr and es; check all three.
-- **No link leaves the app unless it must.** A tap that throws the person into the browser is a website showing
-  through. The shell's link rules:
-  - **the app's own site, and every page of the company's other domains and subdomains** (terms, privacy, help,
-    another product's public page): inside the app. Other domains open on an in-app screen with the page and a
-    native "Close", never the browser;
-  - **the account service's pages** (profile, notifications, account deletion): native screens of the core through the
-    account service's API. Otherwise they are shown inside the app signed in, the app's token traded for the account
-    service's web session as the site already does. Never the browser;
-  - **sign-in itself** is the one exception, and it stays in the system's sign-in surface (Google and passkeys refuse
-    WebViews; Apple wants it). It must look like part of the app: `ASWebAuthenticationSession`'s sheet on iOS, Chrome's
-    Auth Tab or a partial Custom Tab in the app's colours on Android, and it closes by itself once signed in;
-  - **third-party sites** (a payment checkout, a map): an in-app browser sheet (Custom Tab / `SFSafariViewController`)
-    with a close button. Payment pages are never put in the WebView;
-  - `tel:`, `mailto:`, maps and chat links open the phone's own app.
+- **One app, one WebView, every company domain** (Echo, 2026-10-24). A WebView is not limited to one domain: the app's
+  site, the company's other domains and subdomains, and the account service's pages all load in the SAME WebView, with
+  one navigation and the native back. No "close" button, no seam, never the browser.
+  - The bridge (`VougaDevNative`) is injected on a configured list of trusted company origins, never on others.
+  - **Sign-in happens inside the app.** The account service's sign-in page loads in the WebView. Once signed in, it
+    calls the shell through the bridge with the authorisation code, and the shell trades it for the app's tokens. No
+    redirect to a custom scheme, no browser.
+  - **Other companies' logins go native**, because they refuse WebViews. The page asks the shell, which uses the
+    platform's own sign-in: Google through Android's Credential Manager and Google's iOS sign-in, Apple through the
+    native Sign in with Apple sheet. The token goes back to the account service.
+  - **Passkeys work in the WebView** once the app is declared for the account domain: Digital Asset Links with
+    WebView WebAuthn support on Android, Associated Domains (`webcredentials:`) on iOS.
+  - **Only third parties leave the WebView:** a payment checkout or a map opens in an in-app browser sheet (Custom Tab
+    / `SFSafariViewController`), never mixed into the app's WebView. `tel:`, `mailto:`, maps and chat links open the
+    phone's own app.
 - **Never a raw error page.** A bare "Not Found", "Bad Gateway", a proxy's or CDN's error page, or a framework's
   debug or CSRF page inside the app is a website showing through (4.2, and 2.1 completeness):
   - the site serves its own page for every HTTP error (400, 403, 404, an expired form, 500), in its own layout and
@@ -113,11 +114,9 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 
 ### Sign-in outside the WebView: required, and done the right way
 
-- The sign-in page never runs inside the WebView:
-  - Google refuses OAuth in an embedded WebView (`disallowed_useragent`);
-  - passkeys do not work there;
-  - RFC 8252 (OAuth for native apps) forbids it.
-- It opens in the system's sign-in surface, over the app:
+- Superseded for the company's own account service: see "One app, one WebView, every company domain" (sign-in inside
+  the WebView, finished through the bridge, with native sheets for Google and Apple). The system sign-in surface below
+  remains the fallback for an account service that cannot call the shell yet:
   - Android: AppAuth with a Chrome Custom Tab (a tab on top of the app, with a close button), never the full browser
     app;
   - iOS: `ASWebAuthenticationSession`, the system sheet "<App> wants to use <sign-in domain> to sign in".
