@@ -1,6 +1,4 @@
 /* The shell's screens. An app rewords any of them in its own Shell.strings (the sign-in sentence, above all). */
-"shell_load_error_title" = "Page unavailable";
-"shell_load_error_text" = "This page cannot be displayed without an Internet connection. Please check your connection, then try again.";
 "shell_load_error_retry" = "Try again";
 "shell_no_app_for_link" = "No application on this phone can open this link.";
 "shell_signin_text" = "Sign in with your VougaDev account to continue.";
@@ -40,3 +38,10 @@
 "settings_delete_account" = "Delete my account";
 "settings_sign_out" = "Sign out";
 "settings_sign_out_confirm" = "Sign out of %@ on this phone?";
+
+/* No network: the pages kept on the phone. */
+"shell_offline_bar" = "Offline · updated at %@";
+"shell_offline_missing_title" = "Not yet available offline";
+"shell_offline_missing_text" = "This page has not been opened on this phone yet. These pages are kept and available without a connection:";
+"shell_offline_welcome" = "Connect to the Internet once to start. The pages you open are then kept on this phone and remain available without a connection.";
+"shell_signin_offline_kept" = "No connection: signing in will be possible as soon as the network returns. In the meantime, these pages are kept on this phone:";

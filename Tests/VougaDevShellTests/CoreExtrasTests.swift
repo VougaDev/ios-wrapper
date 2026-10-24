@@ -51,6 +51,28 @@ final class NotificationRouteTests: XCTestCase {
     }
 }
 
+@MainActor
+final class OfflinePagesTests: XCTestCase {
+
+    func testPagesAreKeptNewestFirstAndTheOldestGo() {
+        let pages = OfflinePages(storeName: "test-offline-\(UUID().uuidString)", defaults: freshDefaults())
+        pages.maxBytes = 25
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        pages.store(Data(repeating: 1, count: 10), url: URL(string: "https://app.example.org/a/#top")!, title: "A", now: base)
+        pages.store(Data(repeating: 2, count: 10), url: URL(string: "https://app.example.org/b/?x=1")!, title: "B", now: base + 1)
+        XCTAssertEqual(pages.entries.map(\.title), ["B", "A"])
+        XCTAssertEqual(pages.entry(for: URL(string: "https://app.example.org/a/")!)?.title, "A", "kept without its fragment")
+        XCTAssertNil(pages.entry(for: URL(string: "https://app.example.org/b/")!), "the query is part of the page")
+        pages.store(Data(repeating: 3, count: 10), url: URL(string: "https://app.example.org/c/")!, title: "C", now: base + 2)
+        XCTAssertEqual(pages.entries.map(\.title), ["C", "B"], "beyond the limit the oldest went")
+        pages.store(Data(repeating: 4, count: 10), url: URL(string: "https://app.example.org/b/?x=1")!, title: "B2", now: base + 3)
+        XCTAssertEqual(pages.entries.map(\.title), ["B2", "C"], "opened again: newest")
+        XCTAssertEqual(pages.archive(pages.entries[0]), Data(repeating: 4, count: 10))
+        pages.clear()
+        XCTAssertTrue(pages.entries.isEmpty)
+    }
+}
+
 final class OfflineMapTests: XCTestCase {
 
     func testTilePathMatchesTheSitesTiles() {

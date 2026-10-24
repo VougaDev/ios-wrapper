@@ -1,6 +1,4 @@
 /* Les écrans de la coque. Une application peut reformuler chacun d'eux dans son propre Shell.strings. */
-"shell_load_error_title" = "Page indisponible";
-"shell_load_error_text" = "Cette page ne peut pas être affichée sans connexion à Internet. Veuillez vérifier votre connexion, puis réessayer.";
 "shell_load_error_retry" = "Réessayer";
 "shell_no_app_for_link" = "Aucune application de ce téléphone ne peut ouvrir ce lien.";
 "shell_signin_text" = "Connectez-vous avec votre compte VougaDev pour continuer.";
@@ -40,3 +38,10 @@
 "settings_delete_account" = "Supprimer mon compte";
 "settings_sign_out" = "Se déconnecter";
 "settings_sign_out_confirm" = "Se déconnecter de %@ sur ce téléphone ?";
+
+/* No network: the pages kept on the phone. */
+"shell_offline_bar" = "Hors ligne · mis à jour à %@";
+"shell_offline_missing_title" = "Pas encore disponible hors ligne";
+"shell_offline_missing_text" = "Cette page n'a pas encore été ouverte sur ce téléphone. Ces pages sont conservées et disponibles sans connexion :";
+"shell_offline_welcome" = "Connectez-vous à Internet une première fois pour commencer. Les pages que vous ouvrez sont ensuite conservées sur ce téléphone et restent disponibles sans connexion.";
+"shell_signin_offline_kept" = "Aucune connexion : la connexion à votre compte sera possible dès le retour du réseau. En attendant, ces pages sont conservées sur ce téléphone :";

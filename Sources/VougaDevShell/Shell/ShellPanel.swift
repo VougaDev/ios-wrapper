@@ -12,6 +12,9 @@ final class ShellPanel: UIView {
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let button = UIButton(configuration: .filled())
     private let link = UIButton(configuration: .plain())
+    /// The pages kept on the phone, offered when the one asked for is not.
+    private let rows = UIStackView()
+    private let colors: ShellColors
     private let stack: UIStackView
     private var imageSize: NSLayoutConstraint!
     private let brandTitle: UIFont
@@ -21,8 +24,11 @@ final class ShellPanel: UIView {
 
     init(colors: ShellColors, titleFont: UIFont?) {
         brandTitle = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: titleFont ?? .systemFont(ofSize: 34, weight: .bold))
-        stack = UIStackView(arrangedSubviews: [image, title, text, spinner, button, link])
+        stack = UIStackView(arrangedSubviews: [image, title, text, rows, spinner, button, link])
+        self.colors = colors
         super.init(frame: .zero)
+        rows.axis = .vertical
+        rows.spacing = 8
         backgroundColor = colors.background
 
         image.contentMode = .scaleAspectFit
@@ -74,6 +80,7 @@ final class ShellPanel: UIView {
         stack.setCustomSpacing(16, after: image)
         stack.setCustomSpacing(12, after: title)
         stack.setCustomSpacing(32, after: text)
+        stack.setCustomSpacing(32, after: rows)
         stack.setCustomSpacing(32, after: spinner)
         stack.setCustomSpacing(16, after: button)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -90,6 +97,7 @@ final class ShellPanel: UIView {
             wide,
             title.widthAnchor.constraint(equalTo: stack.widthAnchor),
             text.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            rows.widthAnchor.constraint(equalTo: stack.widthAnchor),
             button.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor),
         ])
     }
@@ -99,7 +107,26 @@ final class ShellPanel: UIView {
 
     /// [image] heads the screen ([brand]: the app's mark over its name in its own type; else an icon over a plain title).
     /// [button] nil shows the spinner instead: work under way. [link] is the quiet line under the button.
-    func show(title: String, text: String, button: String?, link: String? = nil, image: UIImage? = nil, brand: Bool = false) {
+    /// [rows] are choices listed under the sentence (a kept page: its title, and what a tap does). [busy] shows the spinner;
+    /// by default when there is no button.
+    func show(title: String, text: String, button: String?, link: String? = nil, image: UIImage? = nil, brand: Bool = false,
+              rows: [(String, () -> Void)] = [], busy: Bool? = nil) {
+        self.rows.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for (label, action) in rows {
+            var look = UIButton.Configuration.gray()
+            look.title = label
+            look.baseForegroundColor = colors.text
+            look.cornerStyle = .fixed
+            look.background.cornerRadius = 12
+            look.titleLineBreakMode = .byTruncatingTail
+            look.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+            let row = UIButton(configuration: look, primaryAction: UIAction { _ in action() })
+            row.contentHorizontalAlignment = .leading
+            row.accessibilityIdentifier = "shell.panel.row"
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+            self.rows.addArrangedSubview(row)
+        }
+        self.rows.isHidden = rows.isEmpty
         self.image.image = image
         self.image.isHidden = image == nil
         imageSize.constant = brand ? 144 : 64
@@ -110,8 +137,9 @@ final class ShellPanel: UIView {
         self.button.configuration?.title = button
         self.link.isHidden = link == nil
         self.link.configuration?.title = link
-        if button == nil { spinner.startAnimating() } else { spinner.stopAnimating() }
-        spinner.isHidden = button != nil
+        let spinning = busy ?? (button == nil)
+        if spinning { spinner.startAnimating() } else { spinner.stopAnimating() }
+        spinner.isHidden = !spinning
         isHidden = false
         UIAccessibility.post(notification: .screenChanged, argument: self.text)
     }

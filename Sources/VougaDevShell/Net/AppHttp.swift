@@ -115,3 +115,8 @@ private final class NoRedirect: NSObject, URLSessionTaskDelegate {
         completionHandler(nil)
     }
 }
+
+/// No network: every call fails as in airplane mode (`ShellConfig.simulateOffline`, the UI tests).
+struct OfflineTransport: HttpTransport {
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) { throw URLError(.notConnectedToInternet) }
+}

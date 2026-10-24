@@ -1,6 +1,4 @@
 /* Las pantallas del contenedor. Una aplicación puede reformular cualquiera de ellas en su propio Shell.strings. */
-"shell_load_error_title" = "Página no disponible";
-"shell_load_error_text" = "Esta página no puede mostrarse sin conexión a Internet. Compruebe su conexión y vuelva a intentarlo.";
 "shell_load_error_retry" = "Reintentar";
 "shell_no_app_for_link" = "Ninguna aplicación de este teléfono puede abrir este enlace.";
 "shell_signin_text" = "Inicie sesión con su cuenta VougaDev para continuar.";
@@ -40,3 +38,10 @@
 "settings_delete_account" = "Eliminar mi cuenta";
 "settings_sign_out" = "Cerrar sesión";
 "settings_sign_out_confirm" = "¿Cerrar sesión de %@ en este teléfono?";
+
+/* No network: the pages kept on the phone. */
+"shell_offline_bar" = "Sin conexión · actualizado a las %@";
+"shell_offline_missing_title" = "Aún no disponible sin conexión";
+"shell_offline_missing_text" = "Esta página aún no se ha abierto en este teléfono. Estas páginas están guardadas y disponibles sin conexión:";
+"shell_offline_welcome" = "Conéctese a Internet una primera vez para empezar. Las páginas que abra se guardan después en este teléfono y siguen disponibles sin conexión.";
+"shell_signin_offline_kept" = "Sin conexión: podrá iniciar sesión en cuanto vuelva la red. Mientras tanto, estas páginas están guardadas en este teléfono:";

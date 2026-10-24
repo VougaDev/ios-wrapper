@@ -39,16 +39,16 @@ final class ShellUITests: XCTestCase {
         snapshot(self, "signin-offline")
     }
 
-    func testAPageThatCannotLoadShowsTheNativeOfflineScreen() {
+    /// Nothing kept on the phone yet and the site out of reach: the app's own welcome, never an error page.
+    func testWithNothingKeptTheAppWelcomesInsteadOfAnError() {
         let app = launch("fr")
         app.buttons["shell.panel.link"].tap()
-        let title = app.staticTexts["shell.panel.title"]
-        XCTAssertTrue(title.waitForExistence(timeout: 30))
-        let offline = NSPredicate(format: "label == %@", "Page indisponible")
-        expectation(for: offline, evaluatedWith: title)
+        let text = app.staticTexts["shell.panel.text"]
+        let welcome = NSPredicate(format: "label BEGINSWITH %@", "Connectez-vous à Internet une première fois")
+        expectation(for: welcome, evaluatedWith: text)
         waitForExpectations(timeout: 30)
-        XCTAssertEqual(app.buttons["shell.panel.button"].label, "Réessayer")
-        snapshot(self, "offline-fr")
+        XCTAssertFalse(app.buttons["shell.panel.button"].exists, "no lone Try again")
+        snapshot(self, "offline-welcome-fr")
     }
 }
 

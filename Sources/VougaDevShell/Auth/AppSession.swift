@@ -17,7 +17,11 @@ open class AppSession {
         store: store, refresher: endpoints, exchange: { [unowned self] in await self.exchange.open($0) }, cookies: cookies
     )
     private lazy var exchange = SessionExchange(origin: origin, userAgent: { [unowned self] in self.userAgent },
-                                                acceptLanguage: Self.acceptLanguage, transport: AppHttp.transport)
+                                                acceptLanguage: Self.acceptLanguage, transport: transport)
+    /// Every call to the site and the account service; with `simulateOffline`, one that always fails.
+    public let transport: HttpTransport
+    /// The site's pages kept on the phone for when there is no network ([OfflinePages]).
+    public private(set) lazy var offlinePages = OfflinePages(storeName: config.storeName, defaults: defaults)
 
     /// What the app keeps on the phone besides the Keychain (UserDefaults of its own `storeName`).
     public let defaults: UserDefaults
@@ -42,7 +46,8 @@ open class AppSession {
         // A Debug build stops at once on what an extension needs and Info.plist lacks; the tests read the same list.
         assert(Self.missingRequirements(extensions, info: Bundle.main.infoDictionary ?? [:]).isEmpty || Bundle.main.bundleIdentifier?.hasPrefix("com.apple.") == true,
                "Info.plist lacks: \(Self.missingRequirements(extensions, info: Bundle.main.infoDictionary ?? [:]))")
-        let transport = AppHttp.transport
+        let transport: HttpTransport = config.simulateOffline ? OfflineTransport() : AppHttp.transport
+        self.transport = transport
         let discoveryDefaults = defaults
         let issuer = config.authBaseURL
         endpoints = AuthEndpoints(client: client, transport: transport) {
@@ -61,14 +66,14 @@ open class AppSession {
     /// A caller of the site's API as the web view's session, renewing it when lost.
     public func caller() -> AppCaller {
         AppCaller(origin: origin, cookies: { [cookies] in await cookies.jar() }, userAgent: { [userAgent] in userAgent },
-                  acceptLanguage: Self.acceptLanguage, renew: { [keeper] in await keeper.renew(lostJar: $0) })
+                  acceptLanguage: Self.acceptLanguage, renew: { [keeper] in await keeper.renew(lostJar: $0) }, transport: transport)
     }
 
     /// True when the person signed in on this phone (a refresh token is kept); the site's session may still need opening.
     public var signedIn: Bool { store.signedIn }
 
     public func discovery() async -> Discovery? {
-        await Self.discovery(issuer: config.authBaseURL, defaults: defaults, transport: AppHttp.transport)
+        await Self.discovery(issuer: config.authBaseURL, defaults: defaults, transport: transport)
     }
 
     /// The account service's discovery document, kept on the phone for a day; the account service out of reach, the phone's copy serves. Nil only before
@@ -94,7 +99,7 @@ open class AppSession {
         if let jar = await cookies.jar(), !jar.isEmpty {
             let fixed = jar
             let caller = AppCaller(origin: origin, cookies: { fixed }, userAgent: { [userAgent] in userAgent },
-                                   acceptLanguage: Self.acceptLanguage, renew: { _ in .signIn })
+                                   acceptLanguage: Self.acceptLanguage, renew: { _ in .signIn }, transport: transport)
             await push?.forget(caller)
             await beforeSessionEnds(caller)
             await endSiteSession(jar)
@@ -102,6 +107,7 @@ open class AppSession {
         if let token = store.refreshToken() { await endpoints.revoke(token) }
         store.clear()
         await cookies.clear()
+        offlinePages.clear()
         await afterSignOut()
     }
 
@@ -124,7 +130,7 @@ open class AppSession {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        _ = try? await AppHttp.transport.send(request)
+        _ = try? await transport.send(request)
     }
 }
 

@@ -24,7 +24,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     public private(set) var webView: WKWebView!
     private lazy var panel = ShellPanel(colors: session.config.colors, titleFont: session.config.titleFont)
     private lazy var browser = BrowserSignIn(session: session)
-    private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlinePage, askPush }
+    private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlineMissing, offlineWelcome, askPush }
 
     private var screen: Screen?
     /// The page to open once the session is open (the sign-in's `next`).
@@ -33,6 +33,15 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// The URL whose main-frame load failed, reloaded by Try again.
     private var failedURL: URL?
     private var booted = false
+    private lazy var network = NetworkWatch(simulatedOffline: session.config.simulateOffline)
+    private lazy var offlineBar = OfflineBar(colors: session.config.colors)
+    /// The real address of the page shown from the phone (no network); nil when the page came from the network.
+    private var showingKept: URL?
+    /// A kept page is being loaded into the web view (the navigation is the app's own, never refused).
+    private var loadingKept = false
+    /// The status of the last main-frame answer: only a 200 is kept.
+    private var mainStatus: Int?
+    private var firstPageShown = false
 
     public init(session: AppSession) {
         self.session = session
@@ -101,6 +110,15 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
         // A tapped notification; one that arrived before this screen existed (a cold start) is handed over now.
         session.push?.onRoute = { [weak self] in self?.route($0) }
+        offlineBar.isHidden = true
+        offlineBar.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(offlineBar, belowSubview: panel)
+        NSLayoutConstraint.activate([
+            offlineBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            offlineBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            offlineBar.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        network.onChange = { [weak self] online in self?.networkChanged(online) }
     }
 
     open override func viewDidAppear(_ animated: Bool) {
@@ -111,17 +129,17 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     }
 
     /// This start's first screen. Never signed in on this phone: the sign-in screen (cookies left by anything else are
-    /// not the app's, they go). Signed in but the site's session gone: renewed first. Else the home page.
+    /// not the app's, they go); with no network, the pages kept from an earlier visit, else the app's welcome. Signed in
+    /// but the site's session gone: renewed first. Else the home page, or with no network the last page kept.
     private func boot() {
-        guard session.signedIn else {
-            Task {
+        Task {
+            let online = await network.current()
+            guard session.signedIn else {
                 await session.cookies.clear()
                 forgetLocalData()
+                if !online, let last = session.offlinePages.entries.first { return showKept(last) }
+                return show(online ? .signIn : .offlineWelcome)
             }
-            show(.signIn)
-            return
-        }
-        Task {
             if SessionCookies.isSignedIn(await session.cookies.jar()) {
                 let target = afterSignIn ?? home
                 afterSignIn = nil
@@ -220,6 +238,11 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         switch LinkPolicy.decide(scheme: url.scheme, isSite: isSite, isAuth: auth.matches(url), isNativeRoute: screen != nil, path: path,
                                   authSignInPaths: session.config.authSignInPaths) {
         case .loadInside:
+            // The UI tests' "no network": a page of the network is never loaded, as in airplane mode.
+            if session.config.simulateOffline && !loadingKept {
+                decisionHandler(.cancel)
+                return offlineFallback(url)
+            }
             // A new window of the site's (`target="_blank"`) opens here: the app has one window.
             if action.targetFrame == nil {
                 decisionHandler(.cancel)
@@ -245,14 +268,33 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if navigationResponse.isForMainFrame { mainStatus = (navigationResponse.response as? HTTPURLResponse)?.statusCode }
+        decisionHandler(.allow)
+    }
+
     public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        if screen == .offlinePage { hidePanel() }
+        if screen == .offlineMissing || screen == .offlineWelcome { hidePanel() }
         failedURL = nil
+        firstPageShown = true
+        if loadingKept {
+            loadingKept = false
+        } else {
+            showingKept = nil
+            offlineBar.isHidden = true
+        }
     }
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         webView.scrollView.refreshControl?.endRefreshing()
+        notifyNetwork()
         guard origin.matches(webView.url) else { return }
+        // A page of the site from the network, answered 200: kept for when there is no network.
+        if showingKept == nil, mainStatus == 200, let url = webView.url, routePath(url)?.hasPrefix("/auth/") == false {
+            Task { await session.offlinePages.save(webView, url: url) }
+        }
+        guard showingKept == nil else { return }
         Task {
             if SessionCookies.isSignedIn(await session.cookies.jar()) { signedInPage() }
         }
@@ -264,8 +306,70 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         // A navigation this class cancelled (a link handed out, a sign-in taken over) is not a failure.
         if failure.domain == NSURLErrorDomain && failure.code == NSURLErrorCancelled { return }
         if failure.domain == "WebKitErrorDomain" && failure.code == 102 { return }  // frame load interrupted by a policy change
-        failedURL = failure.userInfo[NSURLErrorFailingURLErrorKey] as? URL
-        if screen == nil { show(.offlinePage) }
+        loadingKept = false
+        offlineFallback(failure.userInfo[NSURLErrorFailingURLErrorKey] as? URL)
+    }
+
+    // MARK: - No network
+
+    /// A page that could not load: its kept copy; at launch the last page kept; else what is kept, or the welcome when
+    /// nothing is. Never a dead end (App Review 4.2).
+    private func offlineFallback(_ url: URL?) {
+        let pages = session.offlinePages
+        if let url, let kept = pages.entry(for: url) { return showKept(kept) }
+        if !firstPageShown, let last = pages.entries.first { return showKept(last) }
+        failedURL = url
+        show(pages.entries.isEmpty ? .offlineWelcome : .offlineMissing)
+    }
+
+    /// A kept page in the web view, at its own address (the bridge and the page's scripts see the site's origin), under
+    /// the "Offline · updated at" bar.
+    private func showKept(_ entry: OfflinePages.Entry) {
+        guard let url = URL(string: entry.url), let data = session.offlinePages.archive(entry) else {
+            return show(session.offlinePages.entries.isEmpty ? .offlineWelcome : .offlineMissing)
+        }
+        hidePanel()
+        showingKept = url
+        loadingKept = true
+        offlineBar.show(savedAt: entry.savedAt)
+        webView.load(data, mimeType: "application/x-webarchive", characterEncodingName: "utf-8", baseURL: url)
+    }
+
+    /// The kept pages, newest first, as choices.
+    private func keptRows() -> [(String, () -> Void)] {
+        session.offlinePages.entries.prefix(6).map { entry in
+            let label = entry.title.isEmpty ? (URL(string: entry.url).flatMap(routePath) ?? entry.url) : entry.title
+            return (label, { [weak self] in self?.showKept(entry) })
+        }
+    }
+
+    /// The network came back: the page shown from the phone is fetched again, a waiting screen goes on; it went: pages
+    /// are told.
+    private func networkChanged(_ online: Bool) {
+        notifyNetwork()
+        guard online else { return }
+        if let kept = showingKept { return webView.load(URLRequest(url: kept)) }
+        switch screen {
+        case .offlineWelcome: boot()
+        case .offlineMissing:
+            hidePanel()
+            webView.load(URLRequest(url: failedURL ?? URL(string: home)!))
+        case .offlineSignIn: renewThen(afterSignIn)
+        default: break
+        }
+    }
+
+    /// `network()` and the `vougadev:network` event: `{online, offlinePage, savedAt}` (`savedAt` in ms, or null).
+    private func networkState() -> JSONObject {
+        let saved = showingKept.flatMap { session.offlinePages.entry(for: $0)?.savedAt }
+        return ["online": network.online, "offlinePage": showingKept != nil,
+                "savedAt": saved.map { NSNumber(value: Int64($0.timeIntervalSince1970 * 1000)) } ?? NSNull()]
+    }
+
+    private func notifyNetwork() {
+        guard origin.matches(webView.url) else { return }
+        let detail = NativeBridge.text(networkState())
+        webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('vougadev:network', { detail: \(detail) }));")
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -334,11 +438,14 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             panel.show(title: name, text: Strings.text("shell_signin_failed"), button: Strings.text("shell_signin_button"),
                        link: privacyLink, image: mark, brand: true)
         case .offlineSignIn:
-            panel.show(title: name, text: Strings.text("shell_signin_offline"), button: Strings.text("shell_load_error_retry"),
-                       image: mark, brand: true)
-        case .offlinePage:
-            panel.show(title: Strings.text("shell_load_error_title"), text: Strings.text("shell_load_error_text"),
-                       button: Strings.text("shell_load_error_retry"), image: UIImage(systemName: "wifi.slash"))
+            let rows = keptRows()
+            panel.show(title: name, text: Strings.text(rows.isEmpty ? "shell_signin_offline" : "shell_signin_offline_kept"),
+                       button: Strings.text("shell_load_error_retry"), image: mark, brand: true, rows: rows)
+        case .offlineMissing:
+            panel.show(title: Strings.text("shell_offline_missing_title"), text: Strings.text("shell_offline_missing_text"),
+                       button: Strings.text("shell_load_error_retry"), image: UIImage(systemName: "wifi.slash"), rows: keptRows())
+        case .offlineWelcome:
+            panel.show(title: name, text: Strings.text("shell_offline_welcome"), button: nil, image: mark, brand: true, busy: false)
         case .askPush:
             panel.show(title: name, text: Strings.text("shell_push_text"), button: Strings.text("shell_push_continue"),
                        link: Strings.text("shell_push_later"), image: UIImage(systemName: "bell.badge"))
@@ -364,7 +471,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         switch screen {
         case .offlineSignIn: renewThen(afterSignIn)
         case .signIn, .failed: startBrowserSignIn()
-        case .offlinePage:
+        case .offlineMissing:
             hidePanel()
             webView.load(URLRequest(url: failedURL ?? URL(string: home)!))
         case .askPush:
@@ -398,13 +505,21 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             case .signIn:
                 forgetLocalData()
                 show(.signIn)
-            case .offline: show(.offlineSignIn)
+            case .offline:
+                // No network: the page asked for (or the last one) from the phone, else the sign-in's own message.
+                if let kept = self.afterSignIn.flatMap(URL.init(string:)).flatMap({ self.session.offlinePages.entry(for: $0) })
+                    ?? (self.firstPageShown ? nil : self.session.offlinePages.entries.first) {
+                    self.showKept(kept)
+                } else {
+                    self.show(.offlineSignIn)
+                }
             }
         }
     }
 
-    /// One button: the account service's sign-in sheet.
+    /// One button: the account service's sign-in sheet; with no network, the sign-in says so (and offers what is kept).
     private func startBrowserSignIn() {
+        guard network.online else { return show(.offlineSignIn) }
         show(.working)
         Task {
             switch await browser.start(from: view.window) {
@@ -494,6 +609,9 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
                 self.openSettings()
                 answer(NativeBridge.ok())
+            }),
+            ("network", { [weak self] _, answer in
+                answer(self?.networkState() ?? ["online": true, "offlinePage": false, "savedAt": NSNull()])
             }),
             ("consent", { [weak self] _, answer in
                 answer(self?.session.consent?.state() ?? [:])

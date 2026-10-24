@@ -50,6 +50,9 @@ public struct ShellConfig {
     public var push: ShellPush.Settings?
     /// The purposes the site asks consent for; nil: no consent dialog.
     public var consent: ShellConsent.Settings?
+    /// Debug builds' UI tests only: the app behaves as with no network (every call fails as in airplane mode), with
+    /// the site's real addresses, so the pages kept on the phone are the ones it shows.
+    public var simulateOffline = false
     /// Safari's Web Inspector may attach to the web view (debug builds only).
     public var inspectable: Bool
 
