@@ -70,6 +70,8 @@ final class OfflinePagesTests: XCTestCase {
         XCTAssertEqual(pages.archive(pages.entries[0]), Data(repeating: 4, count: 10))
         pages.clear()
         XCTAssertTrue(pages.entries.isEmpty)
+        XCTAssertEqual(OfflinePages.title("Votre colis ne voyage plus au hasard · Ship", appName: "Ship"), "Votre colis ne voyage plus au hasard")
+        XCTAssertEqual(OfflinePages.title(" Confidentialité ", appName: "Ship"), "Confidentialité")
     }
 }
 

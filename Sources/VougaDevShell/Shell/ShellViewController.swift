@@ -338,7 +338,9 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// The kept pages, newest first, as choices.
     private func keptRows() -> [(String, () -> Void)] {
         session.offlinePages.entries.prefix(6).map { entry in
-            let label = entry.title.isEmpty ? (URL(string: entry.url).flatMap(routePath) ?? entry.url) : entry.title
+            // Never an address on screen: a page without a title is "the home page" or the app's name.
+            let path = URL(string: entry.url).flatMap(routePath)
+            let label = !entry.title.isEmpty ? entry.title : path == "/" ? Strings.text("shell_offline_home") : Strings.appName()
             return (label, { [weak self] in self?.showKept(entry) })
         }
     }

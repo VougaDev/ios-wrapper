@@ -80,13 +80,27 @@ public final class OfflinePages {
         write(kept)
     }
 
-    /// The page the web view shows now, kept (a page of the site, loaded from the network, answered 200).
+    /// The page the web view shows now, kept (a page of the site, loaded from the network, answered 200), under its own
+    /// title. Never another page's: if the person moved on meanwhile, nothing is kept.
     func save(_ webView: WKWebView, url: URL) async {
-        let title = webView.title ?? ""
+        let shown = { webView.url.map(Self.normalized) == Self.normalized(url) }
+        guard shown() else { return }
+        let read = (try? await webView.evaluateJavaScript("document.title")) as? String
+        let title = Self.title(read ?? webView.title ?? "", appName: ShellStrings.appName())
         let data: Data? = await withCheckedContinuation { done in
             webView.createWebArchiveData { result in done.resume(returning: try? result.get()) }
         }
-        if let data { store(data, url: url, title: title) }
+        guard let data, shown() else { return }
+        store(data, url: url, title: title)
+    }
+
+    /// A page's title as the person reads it in a list: without the site's " · <App>" ending.
+    nonisolated static func title(_ raw: String, appName: String) -> String {
+        var title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        for separator in [" · ", " - ", " | ", " — "] where !appName.isEmpty && title.hasSuffix(separator + appName) {
+            title = String(title.dropLast(separator.count + appName.count))
+        }
+        return title
     }
 
     public func clear() {

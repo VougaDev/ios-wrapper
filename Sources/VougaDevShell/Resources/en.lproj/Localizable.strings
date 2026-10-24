@@ -45,3 +45,4 @@
 "shell_offline_missing_text" = "This page has not been opened on this phone yet. These pages are kept and available without a connection:";
 "shell_offline_welcome" = "Connect to the Internet once to start. The pages you open are then kept on this phone and remain available without a connection.";
 "shell_signin_offline_kept" = "No connection: signing in will be possible as soon as the network returns. In the meantime, these pages are kept on this phone:";
+"shell_offline_home" = "Home page";
