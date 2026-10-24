@@ -53,14 +53,14 @@ final class ShellPanel: UIView {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         let guide = safeAreaLayoutGuide
-        // As wide as the margins allow, up to 480 points on an iPad.
-        let wide = stack.widthAnchor.constraint(equalToConstant: 480)
-        wide.priority = .defaultLow
+        // The width of the screen less its margins, at most 480 points (an iPad): a definite width, so the texts wrap
+        // onto as many lines as they need instead of being cut.
+        let wide = stack.widthAnchor.constraint(equalTo: guide.widthAnchor, constant: -64)
+        wide.priority = .defaultHigh
         NSLayoutConstraint.activate([
             stack.centerYAnchor.constraint(equalTo: guide.centerYAnchor),
             stack.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: guide.leadingAnchor, constant: 32),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: guide.trailingAnchor, constant: -32),
+            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 480),
             stack.topAnchor.constraint(greaterThanOrEqualTo: guide.topAnchor, constant: 24),
             wide,
         ])
