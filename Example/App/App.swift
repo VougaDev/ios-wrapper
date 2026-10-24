@@ -33,7 +33,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     /// One sign-in per process: the web view, tracking and later push share it.
     /// The core plus the extensions this app uses: what `VougaDevNative.features()` lists.
     @MainActor static let session = AppSession(config: .app, extensions: [
-        TrackingExtension(paths: TrackingPaths(position: "/api/missions/{id}/position", target: "/api/missions/tracking")),
+        TrackingExtension(paths: TrackingPaths(position: "/api/missions/{id}/position", target: "/api/missions/tracking", endedCodes: ["mission_over"])),
         OfflineMapExtension(config: OfflineMapConfig(manifestPath: "/api/map/offline", tilePath: "/tiles/{source}/{z}/{x}/{y}")),
     ])
 

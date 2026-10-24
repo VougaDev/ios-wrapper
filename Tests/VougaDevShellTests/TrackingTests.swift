@@ -6,7 +6,8 @@ import XCTest
 
 let missionID = "0b5f2a6e-7a8c-4c3e-9d1f-2b3c4d5e6f70"
 let positionPath = "/api/v1/courier/missions/\(missionID)/position"
-let paths = TrackingPaths(position: "/api/v1/courier/missions/{id}/position", target: "/api/v1/courier/tracking")
+let paths = TrackingPaths(position: "/api/v1/courier/missions/{id}/position", target: "/api/v1/courier/tracking",
+                          endedCodes: ["not_on_the_road", "not_started", "not_your_mission"])
 
 final class TrackingRequestTests: XCTestCase {
 
@@ -55,14 +56,14 @@ final class TrackingRequestTests: XCTestCase {
     }
 
     func testPingOutcomes() {
-        XCTAssertEqual(PingOutcome.classify(.ok([:])), .sent)
-        XCTAssertEqual(PingOutcome.classify(.sessionLost), .stopSession)
-        XCTAssertEqual(PingOutcome.classify(.refused(status: 404, code: "", detail: "x")), .stopMission)
-        XCTAssertEqual(PingOutcome.classify(.refused(status: 400, code: "not_on_the_road", detail: "")), .stopMission)
-        XCTAssertEqual(PingOutcome.classify(.refused(status: 400, code: "position_missing", detail: "")), .retry)
-        XCTAssertEqual(PingOutcome.classify(.failed(status: 404)), .stopMission)
-        XCTAssertEqual(PingOutcome.classify(.failed(status: 502)), .retry)
-        XCTAssertEqual(PingOutcome.classify(.offline), .retry)
+        XCTAssertEqual(PingOutcome.classify(.ok([:]), ended: paths.endedCodes), .sent)
+        XCTAssertEqual(PingOutcome.classify(.sessionLost, ended: paths.endedCodes), .stopSession)
+        XCTAssertEqual(PingOutcome.classify(.refused(status: 404, code: "", detail: "x"), ended: paths.endedCodes), .stopMission)
+        XCTAssertEqual(PingOutcome.classify(.refused(status: 400, code: "not_on_the_road", detail: ""), ended: paths.endedCodes), .stopMission)
+        XCTAssertEqual(PingOutcome.classify(.refused(status: 400, code: "position_missing", detail: ""), ended: paths.endedCodes), .retry)
+        XCTAssertEqual(PingOutcome.classify(.failed(status: 404), ended: paths.endedCodes), .stopMission)
+        XCTAssertEqual(PingOutcome.classify(.failed(status: 502), ended: paths.endedCodes), .retry)
+        XCTAssertEqual(PingOutcome.classify(.offline, ended: paths.endedCodes), .retry)
         XCTAssertEqual(PingOutcome.retryError(.failed(status: 502)), "http_502")
         XCTAssertEqual(PingOutcome.retryError(.offline), "network_error")
     }

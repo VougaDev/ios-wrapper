@@ -1,17 +1,18 @@
 import Foundation
 import VougaDevShell
 
-/// Where tracking talks to the site, given by the app (Ship: `/api/v1/courier/missions/{id}/position` and
-/// `/api/v1/courier/tracking`): [position] holds `{id}`, the mission's UUID; [target] names the mission the position
-/// belongs to now.
+/// Where tracking talks to the site, given by the app: [position] holds `{id}`, the mission's UUID; [target] names the
+/// mission the position belongs to now; [endedCodes] are the refusals (`code` of a 400) that mean the mission is over.
 public struct TrackingPaths: Equatable, Sendable {
     public let position: String
     public let target: String
+    public let endedCodes: Set<String>
 
-    public init(position: String, target: String) {
+    public init(position: String, target: String, endedCodes: Set<String> = []) {
         precondition(position.hasPrefix("/") && position.contains("{id}") && target.hasPrefix("/"), "Tracking paths: /…{id}… and /…")
         self.position = position
         self.target = target
+        self.endedCodes = endedCodes
     }
 
     /// The mission's own position address; nil unless [missionID] is a UUID.
@@ -184,14 +185,14 @@ public enum PingOutcome: Equatable {
     case retry
 
     static let gone: Set<Int> = [404, 410]
-    static let over: Set<String> = ["not_on_the_road", "not_started", "not_your_mission"]
 
-    /// The answer of the position POST, after [AppCaller] tried to renew a lost session.
-    public static func classify(_ answer: ApiOutcome) -> PingOutcome {
+    /// The answer of the position POST, after [AppCaller] tried to renew a lost session; [ended] are the app's codes of a
+    /// mission that is over.
+    public static func classify(_ answer: ApiOutcome, ended: Set<String>) -> PingOutcome {
         switch answer {
         case .ok: return .sent
         case .sessionLost: return .stopSession
-        case let .refused(status, code, _): return gone.contains(status) || over.contains(code) ? .stopMission : .retry
+        case let .refused(status, code, _): return gone.contains(status) || ended.contains(code) ? .stopMission : .retry
         case let .failed(status): return gone.contains(status) ? .stopMission : .retry
         case .offline: return .retry
         }

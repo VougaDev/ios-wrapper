@@ -12,7 +12,7 @@ import VougaDevShell
 /// distance to the stop the courier heads for, AS THE WEB VIEW'S SESSION through [AppCaller], which renews a lost
 /// session itself.
 ///
-/// When the server says the mission is over (404, or `not_on_the_road`), it asks ONCE which mission comes next
+/// When the server says the mission is over (404, or one of the app's ended codes), it asks ONCE which mission comes next
 /// ([TrackingTarget]) and carries on with it, or stops. It stops when the account service refuses to renew the session, on [stop], at
 /// sign-out, and six hours after the mission started. A network or server error is retried at the next tick and never
 /// sooner. Updates are never paused by the system (`pausesLocationUpdatesAutomatically = false`): a courier waiting at a
@@ -184,7 +184,7 @@ public final class TrackingService: NSObject, CLLocationManagerDelegate {
         let answer = await caller().postJSON(current.path, Self.body(fix, target: current.target))
         // The request may have been replaced or stopped while the call was in flight.
         if request?.missionID != current.missionID { return request != nil }
-        switch PingOutcome.classify(answer) {
+        switch PingOutcome.classify(answer, ended: paths.endedCodes) {
         case .sent:
             store.recordSent(clock())
             return true
