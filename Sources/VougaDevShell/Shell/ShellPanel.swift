@@ -40,7 +40,11 @@ final class ShellPanel: UIView {
         title.adjustsFontForContentSizeCategory = true
         title.textColor = colors.text
         title.numberOfLines = 0
+        title.lineBreakMode = .byWordWrapping
         title.textAlignment = .center
+        // A title wraps onto the lines it needs, never cut: it may not be squeezed vertically.
+        title.setContentCompressionResistancePriority(.required, for: .vertical)
+        text.setContentCompressionResistancePriority(.required, for: .vertical)
         title.accessibilityTraits = .header
         text.font = .preferredFont(forTextStyle: .body)
         text.adjustsFontForContentSizeCategory = true
@@ -132,6 +136,7 @@ final class ShellPanel: UIView {
         imageSize.constant = brand ? 144 : 64
         self.title.font = brand ? brandTitle : plainTitle
         self.title.text = title
+        self.title.invalidateIntrinsicContentSize()
         self.text.text = text
         self.button.isHidden = button == nil
         self.button.configuration?.title = button
