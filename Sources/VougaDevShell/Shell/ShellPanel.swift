@@ -109,6 +109,16 @@ final class ShellPanel: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Built in code") }
 
+    /// Multi-line labels in a stack need their width to wrap at: the stack's, once it is laid out.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let width = stack.bounds.width
+        guard width > 0, title.preferredMaxLayoutWidth != width else { return }
+        title.preferredMaxLayoutWidth = width
+        text.preferredMaxLayoutWidth = width
+        super.layoutSubviews()
+    }
+
     /// [image] heads the screen ([brand]: the app's mark over its name in its own type; else an icon over a plain title).
     /// [button] nil shows the spinner instead: work under way. [link] is the quiet line under the button.
     /// [rows] are choices listed under the sentence (a kept page: its title, and what a tap does). [busy] shows the spinner;
@@ -146,6 +156,8 @@ final class ShellPanel: UIView {
         if spinning { spinner.startAnimating() } else { spinner.stopAnimating() }
         spinner.isHidden = !spinning
         isHidden = false
+        setNeedsLayout()
+        layoutIfNeeded()
         UIAccessibility.post(notification: .screenChanged, argument: self.text)
     }
 }

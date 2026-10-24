@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import VougaDevOfflineMap
 @testable import VougaDevShell
@@ -68,6 +69,29 @@ final class EdgeAndSignInTests: XCTestCase {
         XCTAssertEqual(items["code_challenge_method"], "S256")
         XCTAssertEqual(url.host, "accounts.google.com")
     }
+}
+
+@MainActor
+final class PanelLayoutTests: XCTestCase {
+
+    /// A long title on a phone's width wraps onto as many lines as it needs, every one of them shown.
+    func testALongTitleIsNeverCut() {
+        let panel = ShellPanel(colors: ShellColors(), titleFont: nil)
+        panel.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        panel.show(title: "Ship", text: "Sign in.", button: "Sign in", image: UIImage(systemName: "shippingbox"), brand: true)
+        let long = "Pas encore enregistré sur ce téléphone, un titre bien plus long que la largeur de l'écran"
+        panel.show(title: long, text: "Cet écran n'a pas encore été ouvert sur ce téléphone.", button: "Réessayer",
+                   link: "Retour", image: UIImage(systemName: "wifi.slash"), rows: [("Confidentialité", {})])
+        let title = panel.allLabels.first { $0.accessibilityIdentifier == "shell.panel.title" }!
+        let needed = title.sizeThatFits(CGSize(width: title.bounds.width, height: .greatestFiniteMagnitude)).height
+        XCTAssertGreaterThan(title.bounds.width, 0)
+        XCTAssertGreaterThanOrEqual(title.bounds.height + 1, needed, "the title has the height of all its lines")
+        XCTAssertGreaterThan(needed, title.font.lineHeight * 1.5, "it wraps")
+    }
+}
+
+private extension UIView {
+    var allLabels: [UILabel] { subviews.flatMap { ($0 as? UILabel).map { [$0] } ?? [] + $0.allLabels } }
 }
 
 @MainActor
