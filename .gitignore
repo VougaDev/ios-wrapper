@@ -1,0 +1,31 @@
+# Secrets: never in this public repository. Each app keeps its own outside git (CI: encrypted secrets).
+GoogleService-Info.plist
+*.p12
+*.p8
+*.pem
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.pass
+secrets/
+.env
+.env.*
+AuthKey_*.p8
+*service-account*.json
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Build outputs and tools
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.ipa
+*.dSYM.zip
+*.dSYM/
+.build/
+.swiftpm/
+Pods/
+.DS_Store
