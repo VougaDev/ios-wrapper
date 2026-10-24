@@ -1,0 +1,19 @@
+/* Las pantallas del contenedor. Una aplicación puede reformular cualquiera de ellas en su propio Shell.strings. */
+"shell_load_error_title" = "No se pudo cargar esta página";
+"shell_load_error_text" = "Compruebe la conexión e inténtelo de nuevo.";
+"shell_load_error_retry" = "Reintentar";
+"shell_no_app_for_link" = "Ninguna aplicación de este teléfono puede abrir este enlace.";
+"shell_signin_text" = "Inicie sesión con su cuenta VougaDev para continuar.";
+"shell_signin_button" = "Iniciar sesión con VougaDev";
+"shell_signin_working" = "Abriendo su sesión…";
+"shell_signin_failed" = "No se pudo completar el inicio de sesión. Inténtelo de nuevo.";
+"shell_signin_offline" = "Sin conexión: no se pudo abrir su sesión. Compruebe la red e inténtelo de nuevo.";
+"shell_signing_out" = "Cerrando sesión…";
+"shell_ok" = "Aceptar";
+"shell_cancel" = "Cancelar";
+
+/* La información que se muestra antes del primer uso compartido de la ubicación. %@ es el nombre de la aplicación. */
+"tracking_disclosure_title" = "Ubicación compartida durante una misión";
+"tracking_disclosure_text" = "Mientras una misión está en curso, %@ recoge su ubicación aproximadamente una vez por minuto, incluso cuando la aplicación está en segundo plano o no se está usando, para avisar a las personas que esperan de que va en camino y para acreditar el lugar de cada entrega. El uso compartido se detiene cuando termina la misión, cuando cierra la sesión y, como máximo, a las seis horas. El indicador de ubicación lo muestra durante todo ese tiempo.";
+"tracking_disclosure_accept" = "Acepto";
+"tracking_disclosure_decline" = "Ahora no";

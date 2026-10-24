@@ -1,0 +1,19 @@
+/* The shell's screens. An app rewords any of them in its own Shell.strings (the sign-in sentence, above all). */
+"shell_load_error_title" = "This page could not be loaded";
+"shell_load_error_text" = "Please check the connection and try again.";
+"shell_load_error_retry" = "Try again";
+"shell_no_app_for_link" = "No application on this phone can open this link.";
+"shell_signin_text" = "Sign in with your VougaDev account to continue.";
+"shell_signin_button" = "Sign in with VougaDev";
+"shell_signin_working" = "Opening your session…";
+"shell_signin_failed" = "The sign-in could not be completed. Please try again.";
+"shell_signin_offline" = "No connection: your session could not be opened. Please check the network and try again.";
+"shell_signing_out" = "Signing out…";
+"shell_ok" = "OK";
+"shell_cancel" = "Cancel";
+
+/* The disclosure shown before the first position sharing. %@ is the app's name. */
+"tracking_disclosure_title" = "Position sharing during a mission";
+"tracking_disclosure_text" = "While a mission is under way, %@ collects your position about once a minute, even when the app is in the background or not in use, to tell the people waiting that you are on the way and to prove where each handover took place. The sharing stops when the mission ends, when you sign out, and after six hours at most. The location indicator shows it the whole time.";
+"tracking_disclosure_accept" = "I agree";
+"tracking_disclosure_decline" = "Not now";

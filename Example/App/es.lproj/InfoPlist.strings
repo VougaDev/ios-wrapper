@@ -1,0 +1,5 @@
+/* Textos de uso (App Review 5.1.1, 5.1.5): para qué sirve cada permiso, en el idioma de la persona. */
+"CFBundleDisplayName" = "VougaDev Ejemplo";
+"NSLocationWhenInUseUsageDescription" = "Su ubicación se comparte con las personas que esperan mientras está en curso una misión que usted ha iniciado, y acredita el lugar de cada entrega.";
+"Tracking" = "La ubicación precisa indica a las personas que esperan dónde se encuentra y acredita el lugar de cada entrega.";
+"NSCameraUsageDescription" = "La cámara toma la foto que usted adjunta a un formulario, por ejemplo la de un paquete en su entrega.";

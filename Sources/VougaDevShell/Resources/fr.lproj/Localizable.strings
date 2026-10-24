@@ -1,0 +1,19 @@
+/* Les écrans de la coque. Une application peut reformuler chacun d'eux dans son propre Shell.strings. */
+"shell_load_error_title" = "La page n'a pas pu être chargée";
+"shell_load_error_text" = "Veuillez vérifier la connexion et réessayer.";
+"shell_load_error_retry" = "Réessayer";
+"shell_no_app_for_link" = "Aucune application de ce téléphone ne peut ouvrir ce lien.";
+"shell_signin_text" = "Connectez-vous avec votre compte VougaDev pour continuer.";
+"shell_signin_button" = "Se connecter avec VougaDev";
+"shell_signin_working" = "Ouverture de votre session…";
+"shell_signin_failed" = "La connexion n'a pas pu aboutir. Veuillez réessayer.";
+"shell_signin_offline" = "Aucune connexion : votre session n'a pas pu être ouverte. Veuillez vérifier le réseau et réessayer.";
+"shell_signing_out" = "Déconnexion en cours…";
+"shell_ok" = "OK";
+"shell_cancel" = "Annuler";
+
+/* L'information affichée avant le premier partage de position. %@ est le nom de l'application. */
+"tracking_disclosure_title" = "Partage de la position pendant une mission";
+"tracking_disclosure_text" = "Pendant une mission en cours, %@ collecte votre position environ une fois par minute, même lorsque l'application est en arrière-plan ou n'est pas utilisée, afin de prévenir les personnes qui vous attendent de votre arrivée et de prouver le lieu de chaque remise. Le partage s'arrête à la fin de la mission, à la déconnexion, et au plus tard après six heures. L'indicateur de localisation le signale pendant toute sa durée.";
+"tracking_disclosure_accept" = "J'accepte";
+"tracking_disclosure_decline" = "Pas maintenant";

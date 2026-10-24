@@ -29,3 +29,9 @@ xcuserdata/
 .swiftpm/
 Pods/
 .DS_Store
+
+# XcodeGen's output: project.yml is the source
+*.xcodeproj/
+*.xcworkspace/
+Example/App/Info.plist
+build-*.log

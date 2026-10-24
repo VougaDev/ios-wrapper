@@ -1,0 +1,5 @@
+/* Purpose strings (App Review 5.1.1, 5.1.5): what each permission is for, in the person's language. */
+"CFBundleDisplayName" = "VougaDev Example";
+"NSLocationWhenInUseUsageDescription" = "Your position is shared with the people waiting while a mission you started is under way, and proves where each handover took place.";
+"Tracking" = "Precise location tells the people waiting where you are and proves where each handover took place.";
+"NSCameraUsageDescription" = "The camera takes the photo you attach to a form, such as a package at its handover.";
