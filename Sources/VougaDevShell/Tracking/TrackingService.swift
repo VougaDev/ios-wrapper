@@ -20,17 +20,17 @@ import Foundation
 public final class TrackingService: NSObject, CLLocationManagerDelegate {
 
     // What trackingState() reports as lastError, the same codes on every platform.
-    public static let errorLocationPermission = "location_permission_denied"
-    public static let errorLocationDisabled = "location_disabled"
-    public static let errorNoRecentFix = "no_recent_fix"
-    public static let errorNetwork = "network_error"
-    public static let errorMissionEnded = "mission_ended"
-    public static let errorSessionLost = "session_lost"
-    public static let errorTimeLimit = "time_limit"
-    public static let errorDeclined = "tracking_declined"
+    public nonisolated static let errorLocationPermission = "location_permission_denied"
+    public nonisolated static let errorLocationDisabled = "location_disabled"
+    public nonisolated static let errorNoRecentFix = "no_recent_fix"
+    public nonisolated static let errorNetwork = "network_error"
+    public nonisolated static let errorMissionEnded = "mission_ended"
+    public nonisolated static let errorSessionLost = "session_lost"
+    public nonisolated static let errorTimeLimit = "time_limit"
+    public nonisolated static let errorDeclined = "tracking_declined"
 
     /// The key of `NSLocationTemporaryUsageDescriptionDictionary` that explains why precise location is asked.
-    public static let precisePurposeKey = "Tracking"
+    public nonisolated static let precisePurposeKey = "Tracking"
 
     static let maxDuration: TimeInterval = 6 * 3600
 

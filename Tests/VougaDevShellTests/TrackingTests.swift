@@ -110,7 +110,7 @@ final class TrackingStoreAndServiceTests: XCTestCase {
         XCTAssertTrue(store.state(running: nil)["missionId"] is NSNull)
     }
 
-    private func service(_ answer: @escaping (URLRequest) -> (Int, [String: String], String)) -> (TrackingService, FakeTransport) {
+    private func makeService(_ answer: @escaping (URLRequest) -> (Int, [String: String], String)) -> (TrackingService, FakeTransport) {
         let defaults = freshDefaults()
         let transport = FakeTransport(answer)
         let caller = AppCaller(origin: origin, cookies: { "csrftoken=t; sessionid=s" }, userAgent: { "UA" }, acceptLanguage: { "en" },
@@ -126,7 +126,7 @@ final class TrackingStoreAndServiceTests: XCTestCase {
     private let request = TrackingRequest(missionID: missionID, intervalSeconds: 300, target: LatLng(lat: 0.39, lng: 9.45), title: "t", text: nil)
 
     func testATickPostsTheFreshFixWithItsDistance() async throws {
-        let (service, transport) = service { _ in (200, [:], #"{"tracked_at": "now", "interval_seconds": 60}"#) }
+        let (service, transport) = makeService { _ in (200, [:], #"{"tracked_at": "now", "interval_seconds": 60}"#) }
         service.start(request)
         let stillRunning = await service.tick(request)
         XCTAssertTrue(stillRunning)
@@ -149,7 +149,7 @@ final class TrackingStoreAndServiceTests: XCTestCase {
 
     func testAnEndedMissionHandsOverOnceOrStops() async {
         let next = "1b5f2a6e-7a8c-4c3e-9d1f-2b3c4d5e6f70"
-        let (service, transport) = service { request in
+        let (service, transport) = makeService { request in
             request.url!.path.hasSuffix("/tracking")
                 ? (200, [:], #"{"mission": {"id": "\#(next)"}, "interval_seconds": 60}"#)
                 : (400, [:], #"{"code": "not_on_the_road", "detail": "Over."}"#)
@@ -172,7 +172,7 @@ final class TrackingStoreAndServiceTests: XCTestCase {
     }
 
     func testALostSessionStopsTracking() async {
-        let (service, _) = service { _ in (401, [:], "") }
+        let (service, _) = makeService { _ in (401, [:], "") }
         service.start(request)
         service.receive(CLLocation(latitude: 0.39, longitude: 9.45))
         let running = await service.tick(request)

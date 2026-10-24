@@ -14,7 +14,7 @@ final class ShellPanel: UIView {
     init(colors: ShellColors) {
         super.init(frame: .zero)
         backgroundColor = colors.background
-        for (label, style, color) in [(title, UIFont.TextStyle.title2, colors.text), (text, .body, colors.muted)] {
+        for (label, style, color) in [(title, UIFont.TextStyle.title2, colors.text), (text, UIFont.TextStyle.body, colors.muted)] {
             label.font = .preferredFont(forTextStyle: style)
             label.adjustsFontForContentSizeCategory = true
             label.textColor = color
