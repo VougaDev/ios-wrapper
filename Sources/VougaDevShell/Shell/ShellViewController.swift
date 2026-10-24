@@ -639,6 +639,9 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
+    /// An outside step started by the app itself (its own native screens; the UI tests): as `openOutside`.
+    public func openOutside(url: String, returnURL: String?) async -> JSONObject { await runOutside(url: url, returnURL: returnURL) }
+
     /// AN OUTSIDE STEP ([OutsideStep]): the sheet over the app; its return address loads in the web view.
     private func runOutside(url: String?, returnURL: String?) async -> JSONObject {
         guard let prefix = session.config.outsideReturnPrefix,
@@ -647,6 +650,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
         switch await outsideStep.open(step, returnTo: target, prefix: prefix, window: view.window) {
         case let .returned(back):
+            hidePanel()
             webView.load(URLRequest(url: back))
             return NativeBridge.ok()
         case let other:
