@@ -24,9 +24,19 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - **Native features that matter to the job.** Background location for a mission, offline data and maps, a camera
   scanner, offline actions queued and sent later, push notifications. Ship's courier app has all of them natively.
 - **Native screens for the core flow.** Ship's missions are native, not WebView pages.
-- **No browser chrome.** No address bar, no "open in browser" for the app's own pages, and no blank page when offline
-  (a native offline screen instead). Sign-in in the system browser session (`ASWebAuthenticationSession` on iOS,
+- **No browser chrome.** No address bar, and no "open in browser" for the app's own pages. Sign-in in the system browser session (`ASWebAuthenticationSession` on iOS,
   AppAuth on Android) is fine.
+- **Offline is the test reviewers run first, and a dead end fails it.** "Page unavailable, check your connection,
+  retry" is a website's error, however native its drawing: it is what 4.2 calls a repackaged website. With no network
+  the app must stay useful:
+  - it opens on what the person had: the pages already visited, served from the phone (an offline cache of the site's
+    pages and their assets), with a quiet "Offline: last updated at …" bar;
+  - native screens that work offline (Ship: the courier's missions, their map, the handovers recorded and sent when
+    the network returns);
+  - actions that need the network are queued, or said to be waiting, and are never just refused;
+  - only a page never visited says it is not available offline, and it offers what is (the cached pages, the native
+    screens), never a lone "retry" button.
+  - A first launch with no network shows the app's own welcome, not an error.
 - **The shell's core alone is never enough.** Core = the WebView, the system sign-in, the link rules, the offline
   screen. Every app enables at least one real native extension that matters to its users: `tracking`, `offline-map`
   (the site's own maps keep working offline), a scanner, push, or its own native screens. An app whose
@@ -162,7 +172,10 @@ Report each line as done, failed and fixed, or skipped (with why). Never say "co
    - iOS: purpose strings present and specific; `UIBackgroundModes` limited to `location` and `remote-notification`.
 4. **Disclosure.** On a fresh install, the first tracking start shows the disclosure before any system prompt.
    Declining starts nothing and blocks nothing else.
-5. **Offline.** Airplane mode at launch shows a native screen, never a browser error page.
+5. **Offline.** In airplane mode, after a first signed-in visit:
+   - relaunch: the app opens on the last pages from the phone, with the native screens;
+   - tap through them, and try an action, which must be queued or wait, never fail.
+   Any screen that is only "unavailable / retry" fails the check.
 6. **4.2 evidence.** List the native features with the steps to see each one, for the review notes. Make sure the demo
    account has missions and shipments.
 7. **Login (iOS only).** Check whether the sign-in page shows Google or Telegram for this client. If it does, Sign in
