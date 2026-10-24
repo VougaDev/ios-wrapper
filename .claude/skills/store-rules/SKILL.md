@@ -71,6 +71,20 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
     page works in the WebView, it stays there.
   - **Outside sites the person chose to open** (a map, another company's site) open in an in-app sheet. `tel:`,
     `mailto:`, maps and chat links open the phone's own app.
+- **Company pages shown inside the apps** (the app's site, the account service, the checkout) follow the platforms'
+  own interface rules (Apple's Human Interface Guidelines, Material Design), not a website's:
+  - touch targets of at least 44 pt (iOS) / 48 dp (Android); nothing that works only on hover;
+  - the safe areas respected (`env(safe-area-inset-*)`, `viewport-fit=cover`): nothing under the notch or the
+    home indicator;
+  - dialogs on a phone are bottom sheets or full-screen, with the main action at the bottom within thumb reach;
+  - no web words (the table above), no "open in a new tab", no browser-only gestures;
+  - they read the app's user agent (` <App>App/<version> (Android|iOS)`) to adapt layout and wording, server-side and
+    inside iframes alike. They use `VougaDevNative` (where injected) only for actions.
+- **An outside step that must leave the WebView** (PayPal, a bank's 3-D Secure, an operator's page that refuses
+  WebViews) opens in the system's sheet that can watch for its return. On iOS, `ASWebAuthenticationSession` with an
+  https callback; on Android, Chrome's Auth Tab with an https callback (a Custom Tab as fallback). The provider's return
+  address is a company-domain https path declared for every app (`assetlinks.json` and `apple-app-site-association`
+  on that domain). When the sheet reaches it, the sheet closes by itself and the WebView loads it.
 - **Never a raw error page.** A bare "Not Found", "Bad Gateway", a proxy's or CDN's error page, or a framework's
   debug or CSRF page inside the app is a website showing through (4.2, and 2.1 completeness):
   - the site serves its own page for every HTTP error (400, 403, 404, an expired form, 500), in its own layout and
