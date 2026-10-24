@@ -41,7 +41,7 @@ public enum PKCE {
         base64url(Data(SHA256.hash(data: Data(verifier.utf8))))
     }
 
-    static func randomToken() -> String {
+    public static func randomToken() -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         precondition(status == errSecSuccess, "No random bytes")
