@@ -21,6 +21,9 @@ only through `features()`.
 | `features()` | the app's extensions, e.g. `["tracking", "offline-map", "missions"]`, synchronous | core |
 | `openSettings()` | `Promise<{ok: true}>`: the app's native Settings | core |
 | `consent()` | `Promise<{<purpose>: true \| false}>`, all false before the person answered | core |
+| `network()` | `Promise<{online, offlinePage, savedAt}>`; the window event `vougadev:network` carries the same | core |
+| `completeSignIn({code, state})` | `Promise<{ok: true} \| {ok: false, error}>`: the account service's page hands back the sign-in's code | core |
+| `nativeSignIn("apple" \| "google")` | `Promise<{ok: true, provider, idToken, …} \| {ok: false, error}>`: the phone's own sign-in sheets | core |
 | `startTracking({missionId, url?, intervalSeconds?, target?, title?, text?})` | `Promise<{ok: true} \| {ok: false, error}>` | `tracking` |
 | `stopTracking()` | `Promise<{ok: true}>` | `tracking` |
 | `trackingState()` | `Promise<{active, missionId, lastSentAt, lastError}>` | `tracking` |
@@ -47,16 +50,17 @@ Every app has it; it is the `VougaDevShell` library.
 
 | | |
 |---|---|
-| Sign-in | `ASWebAuthenticationSession` over the app, PKCE S256, the app's own public client at the account service, never inside the web view. The access token is traded at `POST /auth/app-session/` for the site's session cookie; the refresh token stays in the Keychain (`AfterFirstUnlockThisDeviceOnly`) and renews a lost session silently, one renewal at a time. |
+| Sign-in | Inside the app: the account service's page in the web view (`signInInWebView`), finished by `completeSignIn` or its redirect to the app's address; Google and Apple through `nativeSignIn`, since they refuse web views. Until the account service calls the shell, the system sign-in sheet (`ASWebAuthenticationSession`) is the fallback. PKCE S256, the app's own public client. The access token is traded at `POST /auth/app-session/` for the site's session cookie; the refresh token stays in the Keychain (`AfterFirstUnlockThisDeviceOnly`) and renews a lost session silently, one renewal at a time. |
 | Sign-out | The web's `POST /auth/logout/` (or Settings) signs out of this app on this phone: the push token forgotten, each extension's `signOut()`, the site's session ended, the refresh token revoked, cookies and web data cleared. The VougaDev session in Safari stays. |
-| Links | The app's pages inside; its sign-in pages run the native sign-in; the account service's own pages, other sites, `tel:`, `mailto:`, maps open outside; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. An extension may claim a same-origin path for a native screen. |
+| Links | One app, one web view: the site, the company's other domains and subdomains (`companyDomains`) and the account service load in the same web view, with one navigation and swipe back. `window.VougaDevNative` exists only on the trusted origins (`trustedOrigins`: the site's, the account service's). An outside company's site opens in an in-app sheet (`SFSafariViewController`); `tel:`, `mailto:`, maps and chat go to the phone's apps; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. An extension may claim a same-origin path for a native screen. |
+| Errors | Never a raw error page: a 502, 503, 504 or a CDN's 520–530 on a company page, or a page of the site without its marker (`siteMarker`), is answered as with no network (the saved copy, or what is saved). The site serves its own page for its own errors. |
 | Offline | A native screen (title, sentence, Try again) instead of a browser error, at launch too. |
 | Before sign-in | The sign-in screen links the site's privacy page (`privacyPath`, `/privacy/` by default). |
 | Notifications | Asked once, right after a sign-in, after one native sentence (`shell_push_text`, which the app rewords), never at launch, never a condition. The APNs token goes to the site (`PUT <registerPath>` `{kind: "apns", token, label, platform: "ios", locale, app}`), which hands it to the hub; on sign-out `POST <forgetPath>` `{token}`. A tapped notification `{app, url, screen?, topic, id}`: this app's opens the native screen an extension claims for `screen`, else its page; another app's opens through the system (that app, or Safari); never a blank screen (this app's home). |
 | Settings | Native, opened by the page (`openSettings()`, an item of its account menu shown only in the app), never in the site's main menu: version; notifications (system permission, the hub's topics page); "On this phone" (each extension's rows); "Privacy and data" (privacy policy, cookies and data, delete my account at the account service); sign out. |
 | Consent | When the app declares purposes: a native dialog, asked once before the first page, each purpose off until turned on; the choice is the first-party cookie `vougadev_consent=<purpose>:1\|<purpose>:0` and `consent()`. Changed in Settings. |
 | Pages | JavaScript `alert`/`confirm` as native alerts; camera and microphone streams refused; a crashed page process reloaded; swipe back; pull to refresh. |
-| Texts | English, French and Spanish; an app rewords any text in its own `Shell.strings` table. |
+| Texts | English, French and Spanish, in an app's words, never a website's: no "page", "site", "web", "link", "browser", "click", "URL", "reload", "tab" (nor their French and Spanish words); `.github/check-words.py` fails the build on one. An app rewords any text in its own `Shell.strings` table. |
 
 ## Extensions
 
