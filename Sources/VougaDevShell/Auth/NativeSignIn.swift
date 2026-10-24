@@ -93,11 +93,11 @@ final class NativeSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthori
 
     /// `com.googleusercontent.apps.<id>` for the client `<id>.apps.googleusercontent.com`: the return address Google
     /// gives an iOS client.
-    static func googleScheme(_ clientID: String) -> String {
+    nonisolated static func googleScheme(_ clientID: String) -> String {
         "com.googleusercontent.apps." + clientID.replacingOccurrences(of: ".apps.googleusercontent.com", with: "")
     }
 
-    static func googleAuthorizeURL(clientID: String, request: AuthorizeRequest, nonce: String?) -> URL? {
+    nonisolated static func googleAuthorizeURL(clientID: String, request: AuthorizeRequest, nonce: String?) -> URL? {
         var parts = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")
         parts?.queryItems = [
             URLQueryItem(name: "response_type", value: "code"),

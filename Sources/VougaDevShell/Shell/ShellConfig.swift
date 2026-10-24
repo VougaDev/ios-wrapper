@@ -53,7 +53,7 @@ public struct ShellConfig {
     /// A text every page of the site carries (Ship: `ship-bar`). A page of the main frame without it (a proxy's or CDN's
     /// error page) is never shown: the app answers as with no network. Nil: only the edge's statuses are caught.
     public var siteMarker: String?
-    /// The company's domains (`vougadev.com`): their pages and subdomains load in the app's one web view, never outside.
+    /// The company's domains (`example.org`): their pages and subdomains load in the app's one web view, never outside.
     public var companyDomains: [String] = []
     /// The origins whose pages get `window.VougaDevNative`: the site's and the account service's (for its sign-in), and
     /// any other the app lists. Never an outside one.

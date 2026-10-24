@@ -42,7 +42,7 @@ public enum LinkPolicy {
         return .openOutside
     }
 
-    /// True for [host] on one of the company's [domains] or their subdomains (`pay.vougadev.com` for `vougadev.com`).
+    /// True for [host] on one of the company's [domains] or their subdomains (`pay.example.org` for `example.org`).
     public static func isCompany(host: String?, domains: [String]) -> Bool {
         guard let host = host?.lowercased() else { return false }
         return domains.contains { host == $0.lowercased() || host.hasSuffix("." + $0.lowercased()) }
