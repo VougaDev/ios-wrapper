@@ -44,7 +44,7 @@ final class ShellUITests: XCTestCase {
         app.buttons["shell.panel.link"].tap()
         let title = app.staticTexts["shell.panel.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
-        let offline = NSPredicate(format: "label == %@", "La page n'a pas pu être chargée")
+        let offline = NSPredicate(format: "label == %@", "Page indisponible")
         expectation(for: offline, evaluatedWith: title)
         waitForExpectations(timeout: 30)
         XCTAssertEqual(app.buttons["shell.panel.button"].label, "Réessayer")

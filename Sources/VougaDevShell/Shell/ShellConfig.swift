@@ -34,6 +34,10 @@ public struct ShellConfig {
     public var versionName: String
     public var storeName: String
     public var colors: ShellColors
+    /// The app's mark, over its name on the sign-in screen (144 points, as on the other platform); nil: the name alone.
+    public var mark: UIImage?
+    /// The app's own type for its name on the sign-in screen (scaled with Dynamic Type); nil: the system's, bold.
+    public var titleFont: UIFont?
     public var scopes: String
     /// The account service's authorization endpoint and sign-in pages, as path prefixes: met in the web view, they run
     /// the native sign-in instead (its other pages open in Safari).
@@ -53,7 +57,7 @@ public struct ShellConfig {
     public static let defaultScopes = "openid profile email phone permissions"
 
     public init(baseURL: String, authBaseURL: String, authClientID: String, userAgentToken: String,
-                colors: ShellColors = ShellColors(),
+                colors: ShellColors = ShellColors(), mark: UIImage? = nil, titleFont: UIFont? = nil,
                 redirectURI: String? = nil, storeName: String? = nil, versionName: String? = nil,
                 scopes: String = ShellConfig.defaultScopes, authSignInPaths: [String] = [], privacyPath: String? = "/privacy/",
                 accountDeletionURL: String? = nil, push: ShellPush.Settings? = nil, consent: ShellConsent.Settings? = nil,
@@ -64,6 +68,8 @@ public struct ShellConfig {
         self.authClientID = authClientID
         self.userAgentToken = userAgentToken
         self.colors = colors
+        self.mark = mark
+        self.titleFont = titleFont
         self.redirectURI = redirectURI ?? "\(bundleID):/oauth2redirect"
         self.storeName = storeName ?? bundleID
         self.versionName = versionName ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0")

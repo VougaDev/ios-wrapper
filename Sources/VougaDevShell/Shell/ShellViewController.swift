@@ -22,7 +22,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     public var origin: AppOrigin { session.origin }
     private let auth: AppOrigin
     public private(set) var webView: WKWebView!
-    private lazy var panel = ShellPanel(colors: session.config.colors)
+    private lazy var panel = ShellPanel(colors: session.config.colors, titleFont: session.config.titleFont)
     private lazy var browser = BrowserSignIn(session: session)
     private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlinePage, askPush }
 
@@ -323,18 +323,25 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     private func show(_ next: Screen) {
         screen = next
         let name = Strings.appName()
+        let mark = session.config.mark
         switch next {
-        case .working: panel.show(title: name, text: Strings.text("shell_signin_working"), button: nil)
-        case .signingOut: panel.show(title: name, text: Strings.text("shell_signing_out"), button: nil)
-        case .signIn: panel.show(title: name, text: Strings.text("shell_signin_text"), button: Strings.text("shell_signin_button"), link: privacyLink)
-        case .failed: panel.show(title: name, text: Strings.text("shell_signin_failed"), button: Strings.text("shell_signin_button"), link: privacyLink)
-        case .offlineSignIn: panel.show(title: name, text: Strings.text("shell_signin_offline"), button: Strings.text("shell_load_error_retry"))
+        case .working: panel.show(title: name, text: Strings.text("shell_signin_working"), button: nil, image: mark, brand: true)
+        case .signingOut: panel.show(title: name, text: Strings.text("shell_signing_out"), button: nil, image: mark, brand: true)
+        case .signIn:
+            panel.show(title: name, text: Strings.text("shell_signin_text"), button: Strings.text("shell_signin_button"),
+                       link: privacyLink, image: mark, brand: true)
+        case .failed:
+            panel.show(title: name, text: Strings.text("shell_signin_failed"), button: Strings.text("shell_signin_button"),
+                       link: privacyLink, image: mark, brand: true)
+        case .offlineSignIn:
+            panel.show(title: name, text: Strings.text("shell_signin_offline"), button: Strings.text("shell_load_error_retry"),
+                       image: mark, brand: true)
         case .offlinePage:
             panel.show(title: Strings.text("shell_load_error_title"), text: Strings.text("shell_load_error_text"),
-                       button: Strings.text("shell_load_error_retry"))
+                       button: Strings.text("shell_load_error_retry"), image: UIImage(systemName: "wifi.slash"))
         case .askPush:
             panel.show(title: name, text: Strings.text("shell_push_text"), button: Strings.text("shell_push_continue"),
-                       link: Strings.text("shell_push_later"))
+                       link: Strings.text("shell_push_later"), image: UIImage(systemName: "bell.badge"))
         }
     }
 

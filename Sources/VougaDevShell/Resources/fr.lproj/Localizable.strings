@@ -1,6 +1,6 @@
 /* Les écrans de la coque. Une application peut reformuler chacun d'eux dans son propre Shell.strings. */
-"shell_load_error_title" = "La page n'a pas pu être chargée";
-"shell_load_error_text" = "Veuillez vérifier la connexion et réessayer.";
+"shell_load_error_title" = "Page indisponible";
+"shell_load_error_text" = "Cette page ne peut pas être affichée sans connexion à Internet. Veuillez vérifier votre connexion, puis réessayer.";
 "shell_load_error_retry" = "Réessayer";
 "shell_no_app_for_link" = "Aucune application de ce téléphone ne peut ouvrir ce lien.";
 "shell_signin_text" = "Connectez-vous avec votre compte VougaDev pour continuer.";

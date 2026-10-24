@@ -1,6 +1,6 @@
 /* Las pantallas del contenedor. Una aplicación puede reformular cualquiera de ellas en su propio Shell.strings. */
-"shell_load_error_title" = "No se pudo cargar esta página";
-"shell_load_error_text" = "Compruebe la conexión e inténtelo de nuevo.";
+"shell_load_error_title" = "Página no disponible";
+"shell_load_error_text" = "Esta página no puede mostrarse sin conexión a Internet. Compruebe su conexión y vuelva a intentarlo.";
 "shell_load_error_retry" = "Reintentar";
 "shell_no_app_for_link" = "Ninguna aplicación de este teléfono puede abrir este enlace.";
 "shell_signin_text" = "Inicie sesión con su cuenta VougaDev para continuar.";

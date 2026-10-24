@@ -1,6 +1,6 @@
 /* The shell's screens. An app rewords any of them in its own Shell.strings (the sign-in sentence, above all). */
-"shell_load_error_title" = "This page could not be loaded";
-"shell_load_error_text" = "Please check the connection and try again.";
+"shell_load_error_title" = "Page unavailable";
+"shell_load_error_text" = "This page cannot be displayed without an Internet connection. Please check your connection, then try again.";
 "shell_load_error_retry" = "Try again";
 "shell_no_app_for_link" = "No application on this phone can open this link.";
 "shell_signin_text" = "Sign in with your VougaDev account to continue.";

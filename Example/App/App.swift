@@ -16,6 +16,7 @@ extension ShellConfig {
             accent: UIColor(red: 0.84, green: 0.66, blue: 0.30, alpha: 1),
             onAccent: UIColor(red: 0.08, green: 0.13, blue: 0.17, alpha: 1)
         ),
+        mark: UIImage(systemName: "shippingbox.fill"),
         authSignInPaths: ["/authorize", "/login"],
         accountDeletionURL: "https://auth.example.org/account/delete/",
         inspectable: isDebug
