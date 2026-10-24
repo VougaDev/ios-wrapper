@@ -80,8 +80,8 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - If the sign-in offers Google, Telegram or another third-party login, iOS also requires an equivalent
   privacy-preserving login: Sign in with Apple, or one that limits data to name and e-mail, can hide the e-mail, and
   does no ad tracking.
-- VougaDev's the account service offers Google and Telegram. Before the first iOS submission, either the account service adds Sign in with Apple
-  (an Apple login provider), or the account service hides the social buttons when the client is an iOS app (then "own account
+- If the account service offers Google, Telegram or another social login: before the first iOS submission, either it
+  adds Sign in with Apple, or it hides the social buttons when the client is an iOS app (then "own account
   system only" applies).
 - This is the account service's work, not the app's.
 
@@ -90,8 +90,8 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - **Privacy policy:** linked in the store listing AND reachable inside the app in a few taps. In Ship it is in the
   account menu and at `/privacy/`. It says what is collected, why, who receives it, how long it is kept, and how to ask
   for deletion.
-- **Account deletion inside the app:** required by both stores when accounts can be created. A direct link to the account service's
-  `/account/delete/` page is accepted. It sits in the account menu, "Supprimer mon compte". Google also wants that URL
+- **Account deletion inside the app:** required by both stores when accounts can be created. A direct link to the account
+  service's deletion page is accepted; it sits in the account menu ("Delete my account"). Google also wants that URL
   in the Data safety form.
 - **Data safety (Google) and the privacy "nutrition label" (Apple):** must match what the code sends: location, name,
   e-mail, phone, photos. No tracking, no ads unless declared.
@@ -104,7 +104,7 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - **Prominent disclosure (Google; good practice on iOS):** a screen of our own, before the system prompt, says the
   position is collected "even when the app is closed or not in use", why, and when it stops. The person agrees or
   declines; nothing is tracked before they agree, and a refusal blocks nothing else (Apple 5.1.2: no function may
-  require it). In Ship this is `tracking/TrackingDisclosure.kt`.
+  require it). The shells provide it before the first tracking start.
 - **Android:** a foreground service of type `location`, started while the app is visible, with its notification
   shown. Never `ACCESS_BACKGROUND_LOCATION` unless truly needed: it brings a separate Play review and video.
 - **Play Console:** the foreground-service declaration needs a short video of start, notification and stop.
@@ -147,7 +147,7 @@ Report each line as done, failed and fixed, or skipped (with why). Never say "co
 5. **Offline.** Airplane mode at launch shows a native screen, never a browser error page.
 6. **4.2 evidence.** List the native features with the steps to see each one, for the review notes. Make sure the demo
    account has missions and shipments.
-7. **Login (iOS only).** Check whether the account service's sign-in page shows Google or Telegram for this client. If it does, Sign in
+7. **Login (iOS only).** Check whether the sign-in page shows Google or Telegram for this client. If it does, Sign in
    with Apple must be present.
 8. **Store listings.** The screenshots come from the app (not a browser) and show no other platform. The texts tell a
    story, as Echo's selling rules ask. The privacy URL, the support URL and the account deletion URL are filled in.
