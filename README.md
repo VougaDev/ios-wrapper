@@ -2,7 +2,8 @@
 
 The native shell every VougaDev web app ships as its own App Store app: the product's
 site in a `WKWebView`, the sign-in in the system's sign-in sheet, a native offline screen, and the native features the
-site turns on. It is the Swift package `VougaDevShell` (iOS 17+). Its Android twin is
+app turns on as extensions. It is the Swift package `VougaDevShell` (iOS 17+): the core, and one library per shared
+extension. Its Android twin is
 [VougaDev/android-wrapper](https://github.com/VougaDev/android-wrapper); both expose the same `window.VougaDevNative`.
 
 The shell alone is never submitted: each app adds its own name, icon, site, account-service client and native features
@@ -10,86 +11,117 @@ The shell alone is never submitted: each app adds its own name, icon, site, acco
 
 ## The contract: `window.VougaDevNative`
 
-The same on Android and iOS; a page branches on the platform only through `platform()`. Each app's
-`docs/integration/native-bridge.md` is the full contract (Ship's is the reference).
+The same on Android and iOS; a page branches on the platform only through `platform()`, and on what the app can do
+only through `features()`.
 
-| Member | Result | Feature |
+| Member | Result | Where |
 |---|---|---|
-| `platform()` | `"ios"`, synchronous | always |
-| `version()` | the app's `CFBundleShortVersionString`, synchronous | always |
-| `startTracking({missionId, url?, intervalSeconds?, target?, title?, text?})` | `Promise<{ok: true} \| {ok: false, error}>` | `.tracking` |
-| `stopTracking()` | `Promise<{ok: true}>` | `.tracking` |
-| `trackingState()` | `Promise<{active, missionId, lastSentAt, lastError}>` | `.tracking` |
-| `openMissions({url?})` | `Promise<{ok: true} \| {ok: false, error: "route_refused"}>` | `.missions` |
+| `platform()` | `"ios"`, synchronous | core |
+| `version()` | the app's `CFBundleShortVersionString`, synchronous | core |
+| `features()` | the app's extensions, e.g. `["tracking", "offline-map", "missions"]`, synchronous | core |
+| `openSettings()` | `Promise<{ok: true}>`: the app's native Settings | core |
+| `consent()` | `Promise<{<purpose>: true \| false}>`, all false before the person answered | core |
+| `startTracking({missionId, url?, intervalSeconds?, target?, title?, text?})` | `Promise<{ok: true} \| {ok: false, error}>` | `tracking` |
+| `stopTracking()` | `Promise<{ok: true}>` | `tracking` |
+| `trackingState()` | `Promise<{active, missionId, lastSentAt, lastError}>` | `tracking` |
+| (none) | the site's own map tiles work offline | `offline-map` |
+| an app's own members | as its contract says (Ship: `openMissions({url?})`) | the app |
 
 - A `WKUserScript` at document start, main frames only, that returns at once unless `location.origin` is the app's;
   and a `WKScriptMessageHandlerWithReply` (`vougadevNative`) that answers `origin_refused` to any frame that is not the
-  main frame of the app's origin. Members are fixed in the binary (App Review 2.5.2).
+  main frame of the app's origin. Only the members of the extensions the app has exist. Members are fixed in the
+  binary (App Review 2.5.2).
 - Every Promise resolves, never rejects; the object is frozen. Calls are `{"method", "args"}` JSON texts, the reply is
   the result's JSON text.
-- Error codes: `bridge_unavailable`, `invalid_request`, `origin_refused`, `unknown_method`, `invalid_json`,
+- Error codes: `bridge_unavailable`, `invalid_request`, `origin_refused`, `unknown_method`, `invalid_json`; tracking's
   `invalid_mission_id`, `invalid_url`, `tracking_declined`, `location_permission_denied`, `location_disabled`,
-  `no_recent_fix`, `network_error`, `http_<status>`, `mission_ended`, `session_lost`, `time_limit`, `route_refused`.
-  `foreground_start_refused` never occurs on iOS.
-- The user agent is WebKit's own plus `Mobile/15E148 <Token>App/<version> (iOS)`: the site reads it to hide, inside the
-  app, everything that names the other platform or its download (App Review 2.3.10).
+  `no_recent_fix`, `network_error`, `http_<status>`, `mission_ended`, `session_lost`, `time_limit`
+  (`foreground_start_refused` never occurs on iOS).
+- The user agent is WebKit's own plus `Mobile/15E148 <Token>App/<version> (iOS)`. Inside the app the site hides
+  everything that names the other platform or its download (App Review 2.3.10), every "install the app" prompt (no PWA
+  install, no add-to-home-screen), and its own cookie banner (the app asks natively).
 
-## What the shell does
+## The core
+
+Every app has it; it is the `VougaDevShell` library.
 
 | | |
 |---|---|
-| Sign-in | `ASWebAuthenticationSession` over the app ("<App> wants to use the account service's site to sign in"), PKCE S256, the app's own public client at the account service, never inside the web view. The access token is traded at `POST /auth/app-session/` for the site's session cookie; the refresh token stays in the Keychain (`AfterFirstUnlockThisDeviceOnly`) and renews a lost session silently, one renewal at a time. |
-| Sign-out | The web's `POST /auth/logout/` is taken over: the site's session ended, the refresh token revoked, cookies and web data cleared, tracking stopped. The VougaDev session in Safari stays (no `end_session`). |
-| Links | The app's pages inside; its sign-in pages run the native sign-in; the account service's own pages, other sites, `tel:`, `mailto:`, maps open outside; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. A same-origin path may open a native screen instead ([`nativeScreen(path:)`](Sources/VougaDevShell/Shell/ShellViewController.swift)). |
+| Sign-in | `ASWebAuthenticationSession` over the app, PKCE S256, the app's own public client at the account service, never inside the web view. The access token is traded at `POST /auth/app-session/` for the site's session cookie; the refresh token stays in the Keychain (`AfterFirstUnlockThisDeviceOnly`) and renews a lost session silently, one renewal at a time. |
+| Sign-out | The web's `POST /auth/logout/` (or Settings) signs out of this app on this phone: the push token forgotten, each extension's `signOut()`, the site's session ended, the refresh token revoked, cookies and web data cleared. The VougaDev session in Safari stays. |
+| Links | The app's pages inside; its sign-in pages run the native sign-in; the account service's own pages, other sites, `tel:`, `mailto:`, maps open outside; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. An extension may claim a same-origin path for a native screen. |
 | Offline | A native screen (title, sentence, Try again) instead of a browser error, at launch too. |
-| Before sign-in | The sign-in screen links the site's privacy page (`privacyPath`, `/privacy/` by default; App Review 5.1.1). From there a visitor reads the site's public pages; their sign-in links come back to the native sign-in. |
-| Tracking (`.tracking`) | The disclosure first ([`TrackingDisclosure`](Sources/VougaDevShell/Tracking/TrackingStore.swift)), then Location Services, then While-Using permission (precise asked once more when only approximate is given). Positions are posted every `intervalSeconds` (15…300) to `/api/v1/courier/missions/<id>/position` with `{lat, lon, accuracy_m, fix_at_ms, distance_m}` as the web view's session, in the background too with the location indicator shown; never "Always". Stops on 404 or `not_on_the_road` / `not_started` / `not_your_mission` (after asking `/api/v1/courier/tracking` once for the next mission), on sign-out, on `stopTracking()` and after six hours. Resumed when the app comes back with a mission kept. |
-| Missions (`.missions`) | `openMissions` opens `/courier/missions/…` on the app's native screen when it has one, else in the web view. |
+| Before sign-in | The sign-in screen links the site's privacy page (`privacyPath`, `/privacy/` by default). |
+| Notifications | Asked once, right after a sign-in, after one native sentence (`shell_push_text`, which the app rewords), never at launch, never a condition. The APNs token goes to the site (`PUT <registerPath>` `{kind: "apns", token, label, platform: "ios", locale, app}`), which hands it to the hub; on sign-out `POST <forgetPath>` `{token}`. A tapped notification `{app, url, screen?, topic, id}`: this app's opens the native screen an extension claims for `screen`, else its page; another app's opens through the system (that app, or Safari); never a blank screen (this app's home). |
+| Settings | Native, opened by the page (`openSettings()`, an item of its account menu shown only in the app), never in the site's main menu: version; notifications (system permission, the hub's topics page); "On this phone" (each extension's rows); "Privacy and data" (privacy policy, cookies and data, delete my account at the account service); sign out. |
+| Consent | When the app declares purposes: a native dialog, asked once before the first page, each purpose off until turned on; the choice is the first-party cookie `vougadev_consent=<purpose>:1\|<purpose>:0` and `consent()`. Changed in Settings. |
 | Pages | JavaScript `alert`/`confirm` as native alerts; camera and microphone streams refused; a crashed page process reloaded; swipe back; pull to refresh. |
-| Texts | English, French and Spanish ([Resources](Sources/VougaDevShell/Resources)); an app rewords any text in its own `Shell.strings` table (above all `shell_signin_text`, its sign-in sentence). |
+| Texts | English, French and Spanish; an app rewords any text in its own `Shell.strings` table. |
 
-Differences from Android, each forced by the platform: Location Services are checked before the permission (iOS shows
-no permission dialog while they are off); no notification permission is asked for tracking (the location indicator
-shows it); the sign-in sheet takes no toolbar colour; no pull guard over an open modal yet.
+## Extensions
+
+An extension is one native feature beyond the core ([`ShellExtension`](Sources/VougaDevShell/Shell/ShellExtension.swift)):
+its members of `window.VougaDevNative`, the native screens and notification screens it claims, the Info.plist keys it
+needs (checked at launch: a Debug build stops on a missing one), its own disclosure, its rows in Settings, and its
+hooks (`attach`, `configure` the web view, `signedInPage`, `becameActive`, `signOut`). **Every app has at least one
+real extension**: an app whose `features()` is empty is a web clipping (App Review 4.2.2).
+
+- **`tracking`** ([`VougaDevTracking`](Sources/VougaDevTracking)): a started mission's position shared in the
+  background. The disclosure first, then Location Services, then While-Using permission (precise asked once more when
+  only approximate is given). Positions are posted every `intervalSeconds` (15…300) to the mission's position address
+  with `{lat, lon, accuracy_m, fix_at_ms, distance_m}` as the web view's session, the location indicator shown; never
+  "Always". Stops on 404 or `not_on_the_road` / `not_started` / `not_your_mission` (after asking the target address
+  once for the next mission), on sign-out, on `stopTracking()` and after six hours. Needs `UIBackgroundModes:
+  [location]`, `NSLocationWhenInUseUsageDescription`, `NSLocationTemporaryUsageDescriptionDictionary.Tracking`.
+  `TrackingExtension(paths: TrackingPaths(position: "/…/{id}/position", target: "/…"))`.
+- **`offline-map`** ([`VougaDevOfflineMap`](Sources/VougaDevOfflineMap)): the regions the site lists
+  (`manifestPath`: `{available, tilesets: [{source, name, size, version, url}]}`, `.mbtiles` files) are downloaded on
+  Wi-Fi once signed in, and the site's own tile requests (`tilePath`, e.g. `/tiles/{source}/{z}/{x}/{y}`) are answered
+  from them, so the site's maps keep working with no network. WebKit answers only an app's own URL schemes, so a
+  document-start script sends those requests (from the page and the workers it starts) to `vougadev-tiles:`, answered
+  from the file, else from the network with the web view's session. Settings shows the size and deletes them.
+- **An app's own** (Ship's `missions`): in the app's repository, the same protocol.
 
 ## An app on the shell
 
 The app's own repository holds an `ios/` folder: copy [Example](Example) and change what its files mark `APP`.
 
 1. **`project.yml`** (XcodeGen; no `.xcodeproj` is committed): the package (`url: https://github.com/VougaDev/ios-wrapper`
-   with an exact `revision`, so every release builds one known commit), the bundle id (the same id as the app on the
-   other store keeps one redirect at the account service), the display name, `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`, and only the
-   permissions its features use:
-   - `.tracking`: `UIBackgroundModes: [location]`, `NSLocationWhenInUseUsageDescription`,
-     `NSLocationTemporaryUsageDescriptionDictionary.Tracking`; never `NSLocationAlwaysAndWhenInUseUsageDescription`;
-   - a form with a photo input: `NSCameraUsageDescription`.
+   with an exact `revision`) and the libraries it uses (`VougaDevShell`, `VougaDevTracking`, `VougaDevOfflineMap`), the
+   bundle id (the same as on the other store keeps one redirect at the account service), the display name, versions,
+   and only the Info.plist keys its extensions need (plus `NSCameraUsageDescription` for a form's photo input).
 2. **Purpose strings and the name in en, fr and es**: `App/<lang>.lproj/InfoPlist.strings`, and
-   `CFBundleLocalizations: [en, fr, es]` so the shell's own texts follow the phone's language.
+   `CFBundleLocalizations: [en, fr, es]`; the app's own sentences (sign-in, notifications) in `App/<lang>.lproj/Shell.strings`.
 3. **Icon**: `App/Assets.xcassets/AppIcon.appiconset`, one 1024×1024 PNG without transparency.
-4. **Configuration** in Swift, once ([Example/App/App.swift](Example/App/App.swift)):
+4. **Configuration and extensions** in Swift, once ([Example/App/App.swift](Example/App/App.swift)):
 
    ```swift
    extension ShellConfig {
        static let app = ShellConfig(
-           baseURL: "https://app.example.org",          // the only origin loaded or granted anything
+           baseURL: "https://app.example.org",            // the only origin loaded or granted anything
            authBaseURL: "https://auth.example.org",
-           authClientID: "<the app's public client id>", // PKCE, no secret; redirect <bundle id>:/oauth2redirect
-           userAgentToken: "Ship",                         // " ShipApp/<version> (iOS)"
-           authSignInPaths: ["/authorize", "/login"],      // the account service's sign-in pages: native sign-in instead
-           features: [.tracking, .missions],
-           colors: ShellColors(background: …, text: …, muted: …, accent: …, onAccent: …)
+           authClientID: "<the app's public client id>",   // PKCE, no secret; redirect <bundle id>:/oauth2redirect
+           userAgentToken: "Ship",                           // " ShipApp/<version> (iOS)"
+           colors: ShellColors(background: …, text: …, muted: …, accent: …, onAccent: …),
+           authSignInPaths: ["/authorize", "/login"],        // the account service's sign-in pages: native sign-in instead
+           accountDeletionURL: "https://auth.example.org/account/delete/",
+           push: ShellPush.Settings(appSlug: "<the hub's name for the app>", preferencesURL: "<the hub's topics page>"),
+           consent: nil                                      // or the purposes the site asks consent for
        )
    }
+
+   let session = AppSession(config: .app, extensions: [
+       TrackingExtension(paths: TrackingPaths(position: "/api/…/{id}/position", target: "/api/…/tracking")),
+       OfflineMapExtension(config: OfflineMapConfig(manifestPath: "/api/…/offline", tilePath: "/tiles/{source}/{z}/{x}/{y}")),
+   ])
    ```
 
+   The app delegate makes the session at launch and hands APNs' token to `session.push?.didRegister(deviceToken:)`.
    `storeName` defaults to the bundle id and must never change once shipped (people would be signed out).
-5. **Native screens and members**: subclass `ShellViewController` to return a native screen for a path
-   (`nativeScreen(path:)`), append members to `super.bridgeMethods()` (each one in every platform's contract in the
-   same release), and use the hooks `onSignedInPage`, `afterNewSignIn`, `beforeSignOut`, `forgetLocalData`. A subclass
-   of `AppSession` clears what the app keeps (`beforeSessionEnds`, `afterSignOut`).
-6. **The account service**: register `<bundle id>:/oauth2redirect` on the app's client.
-7. **The site**: honour the user agent (no other platform, no download offer, no digital sale outside in-app purchase
-   inside the iOS app), keep the privacy page and the account service's `/account/delete/` in the account menu.
+5. **The account service**: register `<bundle id>:/oauth2redirect` on the app's client.
+6. **The site**: honour the user agent (no other platform, no download or install prompt, no digital sale outside
+   in-app purchase, no cookie banner inside the app), and an account-menu item, shown only inside the app, that calls
+   `VougaDevNative.openSettings()`.
 
 ## Build and test
 
