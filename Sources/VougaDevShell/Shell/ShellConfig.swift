@@ -50,14 +50,22 @@ public struct ShellConfig {
     public var push: ShellPush.Settings?
     /// The purposes the site asks consent for; nil: no consent dialog.
     public var consent: ShellConsent.Settings?
-    /// A text every page of the site carries (Ship: `ship-bar`). A page of the main frame without it (a proxy's or CDN's
-    /// error page) is never shown: the app answers as with no network. Nil: only the edge's statuses are caught.
+    /// Every company page carries `<meta name="vougadev-page" content="<service>">`: on the site's and the payment
+    /// service's origins, a main-frame page without it is an edge's or a CDN's error, answered as with no network, when
+    /// [requirePageMeta]. [siteMarker] is an older text the site's pages carry (Ship: `ship-bar`), accepted instead.
+    public var requirePageMeta = false
     public var siteMarker: String?
     /// The company's domains (`example.org`): their pages and subdomains load in the app's one web view, never outside.
     public var companyDomains: [String] = []
-    /// The origins whose pages get `window.VougaDevNative`: the site's and the account service's (for its sign-in), and
-    /// any other the app lists. Never an outside one.
+    /// The company's other origins whose pages, and frames inside the site's pages, get `window.VougaDevNative` with
+    /// `platform`, `version`, `features` and `openOutside` (the payment service's checkout). The site's own origin has
+    /// every member and the account service's its sign-in members, without being listed. Never an outside origin.
     public var trustedOrigins: [String] = []
+    /// Where an outside step comes back (`openOutside`): an https prefix on a trusted origin, e.g.
+    /// `https://pay.example.org/app-return/`. Nil: no outside step.
+    public var outsideReturnPrefix: String?
+    /// Providers that refuse web views (`paypal.com`): a navigation there from a company page becomes an outside step.
+    public var outsideHosts: [String] = []
     /// The sign-in runs in the web view (the account service's page, finished with `completeSignIn` or its redirect);
     /// false: in the system sign-in sheet, until the account service calls the shell.
     public var signInInWebView = false

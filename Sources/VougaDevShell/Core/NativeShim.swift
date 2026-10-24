@@ -36,19 +36,43 @@ public enum NativeShim {
 
     /// [version] is the app's version name and [origin] its origin, both written as JSON string literals so they cannot
     /// break out of them; [methods] are the app's members, in the order its contract lists them (plain identifiers only).
-    /// [origins]: the trusted origins (the site's first); on any other the script does nothing.
-    public static func script(origins: [AppOrigin], version: String, features: [String], methods: [String]) -> String {
-        precondition(
-            methods.allSatisfy(isMethodName) && methods.allSatisfy { !builtIn.contains($0) } && Set(methods).count == methods.count,
-            "Bridge members must be distinct identifiers other than \(builtIn): \(methods)"
-        )
+    /// Who gets what: the app's own origin every member; the account service's its sign-in members; the payment
+    /// service's (frames included: its checkout is embedded in the site's pages) `openOutside`.
+    public struct Role: Sendable {
+        public let origin: AppOrigin
+        /// The members on this origin beyond `platform`, `version` and `features`, in the contract's order.
+        public let members: [String]
+        /// Frames of this origin inside a page get the bridge too.
+        public let frames: Bool
+
+        public init(origin: AppOrigin, members: [String], frames: Bool = false) {
+            self.origin = origin
+            self.members = members
+            self.frames = frames
+        }
+    }
+
+    /// The document-start script, in every frame: it does nothing unless the frame's origin has a [Role] (and, in a
+    /// frame inside a page, unless that role takes frames). [version] and the origins are JSON string literals, so they
+    /// cannot break out of them.
+    public static func script(roles: [Role], version: String, features: [String]) -> String {
+        for role in roles {
+            precondition(
+                role.members.allSatisfy(isMethodName) && role.members.allSatisfy { !builtIn.contains($0) } && Set(role.members).count == role.members.count,
+                "Bridge members must be distinct identifiers other than \(builtIn): \(role.members)"
+            )
+        }
         let featureList = "[" + features.map(quote).joined(separator: ", ") + "]"
-        let originList = "[" + origins.map { quote($0.originString) }.joined(separator: ", ") + "]"
-        let members = methods.map { ",\n    \($0): function (args) { return call(\"\($0)\", args); }" }.joined()
+        let roleList = "{" + roles.map { role in
+            "\(quote(role.origin.originString)): { members: [\(role.members.map(quote).joined(separator: ", "))], frames: \(role.frames) }"
+        }.joined(separator: ", ") + "}"
         return """
         (function () {
           "use strict";
-          if (\(originList).indexOf(window.location.origin) < 0) { return; }
+          var roles = \(roleList);
+          var role = Object.prototype.hasOwnProperty.call(roles, window.location.origin) ? roles[window.location.origin] : null;
+          if (!role) { return; }
+          if (window !== window.top && !role.frames) { return; }
           if (window.\(name)) { return; }
           var handlers = window.webkit && window.webkit.messageHandlers;
           var h = handlers ? handlers.\(handler) : null;
@@ -69,12 +93,13 @@ public enum NativeShim {
               }, function () { resolve(unavailable); });
             });
           }
-          var api = Object.freeze({
+          var api = {
             platform: function () { return \(quote(platform)); },
             version: function () { return \(quote(version)); },
-            features: function () { return features.slice(); }\(members)
-          });
-          Object.defineProperty(window, \(quote(name)), { value: api, writable: false, enumerable: false, configurable: false });
+            features: function () { return features.slice(); }
+          };
+          role.members.forEach(function (member) { api[member] = function (args) { return call(member, args); }; });
+          Object.defineProperty(window, \(quote(name)), { value: Object.freeze(api), writable: false, enumerable: false, configurable: false });
         })();
         """
     }

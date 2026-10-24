@@ -54,6 +54,21 @@ final class NotificationRouteTests: XCTestCase {
 
 final class EdgeAndSignInTests: XCTestCase {
 
+    func testAnOutsideStepAndItsReturn() {
+        let prefix = "https://pay.example.org/app-return/"
+        let ok = OutsideStep.check(url: "https://www.paypal.com/checkout?x=1", returnURL: prefix + "c/L1/", prefix: prefix)
+        XCTAssertEqual(ok?.1.absoluteString, prefix + "c/L1/")
+        XCTAssertNil(OutsideStep.check(url: "http://www.paypal.com/", returnURL: nil, prefix: prefix), "https only")
+        XCTAssertNil(OutsideStep.check(url: "https://www.paypal.com/", returnURL: "https://evil.io/app-return/", prefix: prefix))
+        XCTAssertNil(OutsideStep.check(url: "https://www.paypal.com/", returnURL: "https://pay.example.org/elsewhere/", prefix: prefix))
+        XCTAssertEqual(OutsideStep.check(url: "https://www.paypal.com/", returnURL: nil, prefix: prefix)?.1.absoluteString, prefix)
+        let back = prefix + "c/L1/?status=paid"
+        XCTAssertEqual(OutsideStep.returned(URL(string: back), prefix: prefix)?.absoluteString, back)
+        let fallback = URL(string: "vougadev-return://app-return?url=" + back.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)
+        XCTAssertEqual(OutsideStep.returned(fallback, prefix: prefix)?.absoluteString, back, "the fallback scheme's return")
+        XCTAssertNil(OutsideStep.returned(URL(string: "vougadev-return://app-return?url=https%3A%2F%2Fevil.io%2F"), prefix: prefix))
+    }
+
     func testTheEdgesFailuresAreNeverShown() {
         for status in [502, 503, 504, 520, 522, 530] { XCTAssertTrue(ShellViewController.isEdgeError(status), "\(status)") }
         for status in [200, 400, 403, 404, 500] { XCTAssertFalse(ShellViewController.isEdgeError(status), "\(status): the site's own page") }

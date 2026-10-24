@@ -20,19 +20,20 @@ public final class NativeBridge {
     public static let unknownMethod = "unknown_method"
     public static let invalidJSON = "invalid_json"
 
-    let origins: [AppOrigin]
+    let roles: [NativeShim.Role]
     let methods: [String: Method]
 
-    /// [origins]: the trusted origins whose main frames may call (the site's, the account service's for its sign-in).
-    public init(origins: [AppOrigin], methods: [String: Method]) {
-        self.origins = origins
+    /// [roles]: which origin may call which members, and whether its frames inside a page may ([NativeShim.Role]).
+    public init(roles: [NativeShim.Role], methods: [String: Method]) {
+        self.roles = roles
         self.methods = methods
     }
 
     /// [body] is the message's body; [scheme], [host], [port] are the sending frame's security origin.
     public func onMessage(_ body: Any, isMainFrame: Bool, scheme: String?, host: String?, port: Int, reply: @escaping (String) -> Void) {
         let once = Once(reply)
-        guard isMainFrame, origins.contains(where: { $0.matchesParts(scheme: scheme, host: host, port: port) }) else {
+        guard let role = roles.first(where: { $0.origin.matchesParts(scheme: scheme, host: host, port: port) }),
+              isMainFrame || role.frames else {
             return once.send(Self.refused(Self.refusedOrigin))
         }
         guard let text = body as? String, let data = text.data(using: .utf8),
@@ -42,6 +43,8 @@ public final class NativeBridge {
         guard let name = envelope["method"] as? String, let method = methods[name] else {
             return once.send(Self.refused(Self.unknownMethod))
         }
+        // A member this origin does not have (the shim never offers it there).
+        guard role.members.contains(name) else { return once.send(Self.refused(Self.refusedOrigin)) }
         // An object is the arguments; a single value (`nativeSignIn("google")`) comes as `{"value": …}`.
         let raw = envelope["args"]
         let args = raw as? JSONObject ?? ((raw == nil || raw is NSNull) ? nil : ["value": raw!])

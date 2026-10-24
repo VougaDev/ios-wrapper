@@ -26,8 +26,11 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     private lazy var panel = ShellPanel(colors: session.config.colors, titleFont: session.config.titleFont)
     private lazy var browser = BrowserSignIn(session: session)
     private lazy var nativeSignIn = NativeSignIn(googleClientID: session.config.googleClientID, transport: session.transport)
-    /// The origins whose pages get the bridge: the site's, the account service's, and those the app lists.
-    private lazy var trusted: [AppOrigin] = [origin, auth] + session.config.trustedOrigins.map(AppOrigin.init)
+    /// The company's other origins with the payment members (`ShellConfig.trustedOrigins`).
+    private lazy var payment: [AppOrigin] = session.config.trustedOrigins.map(AppOrigin.init)
+    /// Every origin whose pages get the bridge: the site's, the account service's, the payment service's.
+    private lazy var trusted: [AppOrigin] = [origin, auth] + payment
+    private lazy var outsideStep = OutsideStep()
     /// The sign-in running in the web view: its PKCE request, until the account service hands the code back.
     private var pendingSignIn: AuthorizeRequest?
     /// The MIME type of the last main-frame answer: only an HTML page is checked for the site's marker.
@@ -205,10 +208,14 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// any other origin) and the reply handler, which checks the sending frame itself ([NativeBridge]).
     private func installNativeBridge(_ controller: WKUserContentController) {
         let methods = bridgeMethods()
-        let bridge = NativeBridge(origins: trusted, methods: Dictionary(methods, uniquingKeysWith: { first, _ in first }))
-        let script = NativeShim.script(origins: trusted, version: session.config.versionName, features: session.features,
-                                       methods: methods.map { $0.0 })
-        controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        // The site's own origin every member; the account service's its sign-in; the payment service's (its frames too)
+        // the outside step.
+        let roles = [NativeShim.Role(origin: origin, members: methods.map { $0.0 }),
+                     NativeShim.Role(origin: auth, members: ["completeSignIn", "nativeSignIn"])]
+            + payment.map { NativeShim.Role(origin: $0, members: ["openOutside"], frames: true) }
+        let bridge = NativeBridge(roles: roles, methods: Dictionary(methods, uniquingKeysWith: { first, _ in first }))
+        let script = NativeShim.script(roles: roles, version: session.config.versionName, features: session.features)
+        controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         controller.addScriptMessageHandler(BridgeHandler(bridge), contentWorld: .page, name: NativeShim.handler)
     }
 
@@ -246,6 +253,13 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 pendingSignIn = nil
                 show(.failed)
             }
+            return
+        }
+        // A provider that refuses web views (PayPal), reached from a company page: an outside step that comes back.
+        if (action.targetFrame?.isMainFrame ?? true), session.config.outsideReturnPrefix != nil,
+           LinkPolicy.isCompany(host: url.host, domains: session.config.outsideHosts) {
+            decisionHandler(.cancel)
+            Task { _ = await runOutside(url: url.absoluteString, returnURL: nil) }
             return
         }
         let isSite = origin.matches(url)
@@ -335,19 +349,22 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         webView.scrollView.refreshControl?.endRefreshing()
         notifyNetwork()
-        guard origin.matches(webView.url) else { return }
-        // A page of the site's origin without its marker is not the site's (a proxy's error page): never shown.
-        if showingKept == nil, let marker = session.config.siteMarker, mainMIME == "text/html" {
-            let url = webView.url
-            let check = "document.documentElement.outerHTML.indexOf(\(NativeShim.quote(marker))) >= 0"
+        guard let url = webView.url else { return }
+        let config = session.config
+        // A company page of the site's or the payment service's origin carries the company's meta (or the site's older
+        // marker): without it, it is an edge's or a CDN's error page, never shown.
+        if showingKept == nil, config.requirePageMeta || config.siteMarker != nil, mainMIME == "text/html",
+           origin.matches(url) || payment.contains(where: { $0.matches(url) }) {
+            let marker = config.siteMarker.map { "document.documentElement.outerHTML.indexOf(\(NativeShim.quote($0))) >= 0" } ?? "false"
+            let check = "!!document.querySelector('meta[name=\"vougadev-page\"]') || \(marker)"
             webView.evaluateJavaScript(check) { [weak self] found, _ in
                 guard let self else { return }
                 if (found as? Bool) == false { return self.offlineFallback(url) }
-                self.siteFinished(webView)
+                if self.origin.matches(url) { self.siteFinished(webView) }
             }
             return
         }
-        siteFinished(webView)
+        if origin.matches(url) { siteFinished(webView) }
     }
 
     private func siteFinished(_ webView: WKWebView) {
@@ -622,6 +639,21 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
+    /// AN OUTSIDE STEP ([OutsideStep]): the sheet over the app; its return address loads in the web view.
+    private func runOutside(url: String?, returnURL: String?) async -> JSONObject {
+        guard let prefix = session.config.outsideReturnPrefix,
+              let (step, target) = OutsideStep.check(url: url, returnURL: returnURL, prefix: prefix) else {
+            return NativeBridge.refused("invalid_url")
+        }
+        switch await outsideStep.open(step, returnTo: target, prefix: prefix, window: view.window) {
+        case let .returned(back):
+            webView.load(URLRequest(url: back))
+            return NativeBridge.ok()
+        case let other:
+            return NativeBridge.refused(other.error ?? "failed")
+        }
+    }
+
     /// The account service's code for the sign-in running in the web view, by `completeSignIn` or its redirect.
     private func completeWebSignIn(code: String?, state: String?) async -> JSONObject {
         guard let request = pendingSignIn, let code, !code.isEmpty, state == request.state else { return NativeBridge.refused("invalid_state") }
@@ -730,6 +762,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             ("nativeSignIn", { [weak self] args, answer in
                 guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
                 self.nativeSignIn.start(args, window: self.view.window, answer: answer)
+            }),
+            ("openOutside", { [weak self] args, answer in
+                guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
+                Task { answer(await self.runOutside(url: args?["url"] as? String, returnURL: args?["returnUrl"] as? String)) }
             }),
             ("network", { [weak self] _, answer in
                 answer(self?.networkState() ?? ["online": true, "offlinePage": false, "savedAt": NSNull()])
