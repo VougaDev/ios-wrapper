@@ -348,7 +348,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     private func networkChanged(_ online: Bool) {
         notifyNetwork()
         guard online else { return }
-        if let kept = showingKept { return webView.load(URLRequest(url: kept)) }
+        if let kept = showingKept {
+            webView.load(URLRequest(url: kept))
+            return
+        }
         switch screen {
         case .offlineWelcome: boot()
         case .offlineMissing:
