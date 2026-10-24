@@ -64,9 +64,13 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
     native Sign in with Apple sheet. The token goes back to the account service.
   - **Passkeys work in the WebView** once the app is declared for the account domain: Digital Asset Links with
     WebView WebAuthn support on Android, Associated Domains (`webcredentials:`) on iOS.
-  - **Only third parties leave the WebView:** a payment checkout or a map opens in an in-app browser sheet (Custom Tab
-    / `SFSafariViewController`), never mixed into the app's WebView. `tel:`, `mailto:`, maps and chat links open the
-    phone's own app.
+  - **Payment stays in the WebView too.** The company's checkout (VougaPay, a company domain) is just another page.
+    Only a step from an outside company that refuses WebViews (a bank's 3-D Secure page, a mobile-money operator's
+    confirmation, Google Pay or Apple Pay) is handed to an in-app sheet (Custom Tab / `SFSafariViewController`, or the
+    native Google Pay / Apple Pay sheet through the bridge). It returns to the WebView by itself once done. If such a
+    page works in the WebView, it stays there.
+  - **Outside sites the person chose to open** (a map, another company's site) open in an in-app sheet. `tel:`,
+    `mailto:`, maps and chat links open the phone's own app.
 - **Never a raw error page.** A bare "Not Found", "Bad Gateway", a proxy's or CDN's error page, or a framework's
   debug or CSRF page inside the app is a website showing through (4.2, and 2.1 completeness):
   - the site serves its own page for every HTTP error (400, 403, 404, an expired form, 500), in its own layout and
