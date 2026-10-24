@@ -12,7 +12,7 @@ public enum ApiOutcome {
     case offline
 
     /// The web view's session is gone: a redirect (to the sign-in), a 401, or a 403 without a problem body (the site's
-    /// CSRF page).
+    /// CSRF refusal).
     case sessionLost
 
     /// Neither an answer nor a refusal (an edge's HTML error page, a body that is not JSON).

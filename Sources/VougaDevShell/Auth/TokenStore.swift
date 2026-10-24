@@ -8,7 +8,7 @@ public protocol SecretVault: AnyObject {
 }
 
 /// THE APP'S REFRESH TOKEN, IN THE KEYCHAIN, readable after the first unlock and never restored to another phone
-/// (`ThisDeviceOnly`), as Android seals it with a Keystore key. the account service rotates it: every refresh answers a new one and the
+/// (`ThisDeviceOnly`), as Android seals it with a Keystore key. The account service rotates it: every refresh answers a new one and the
 /// old one is spent, so [save] is called with each answer and the new token replaces the old at once.
 ///
 /// The access token is never written: it lives a few minutes and is traded at once for the site's session.

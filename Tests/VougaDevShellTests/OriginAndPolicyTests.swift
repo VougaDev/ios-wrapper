@@ -31,13 +31,13 @@ final class OriginAndPolicyTests: XCTestCase {
 
     func testLinkPolicyTable() {
         func decide(_ scheme: String?, site: Bool = false, auth: Bool = false, native: Bool = false, path: String? = nil) -> LinkPolicy.Decision {
-            LinkPolicy.decide(scheme: scheme, isSite: site, isAuth: auth, isNativeRoute: native, path: path)
+            LinkPolicy.decide(scheme: scheme, isSite: site, isAuth: auth, isNativeRoute: native, path: path, authSignInPaths: ["/authorize", "/login"])
         }
         XCTAssertEqual(decide("https", site: true, path: "/"), .loadInside)
         XCTAssertEqual(decide("https", site: true, path: "/auth/login/"), .signIn)
         XCTAssertEqual(decide("https", site: true, path: "/auth/login"), .signIn)
-        XCTAssertEqual(decide("https", auth: true, path: "/identity/o/authorize/"), .signIn)
-        XCTAssertEqual(decide("https", auth: true, path: "/accounts/signup/"), .signIn)
+        XCTAssertEqual(decide("https", auth: true, path: "/authorize/"), .signIn)
+        XCTAssertEqual(decide("https", auth: true, path: "/login/?next=x"), .signIn)
         XCTAssertEqual(decide("https", auth: true, path: "/account/delete/"), .openOutside)
         XCTAssertEqual(decide("https", site: true, native: true, path: "/courier/missions/"), .openNative)
         XCTAssertEqual(decide("https", path: "/"), .openOutside)

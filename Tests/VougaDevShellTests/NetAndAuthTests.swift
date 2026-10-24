@@ -89,15 +89,15 @@ final class AuthTests: XCTestCase {
     }
 
     func testDiscoveryNeedsHTTPSEndpoints() {
-        let good = #"{"issuer":"https://auth.example.org","authorization_endpoint":"https://auth.example.org/identity/o/authorize/","token_endpoint":"https://auth.example.org/identity/o/token/"}"#
-        XCTAssertEqual(Discovery.parse(Data(good.utf8))?.tokenEndpoint, "https://auth.example.org/identity/o/token/")
-        XCTAssertNil(Discovery.parse(Data(good.replacingOccurrences(of: "https://auth.example.org/identity/o/token/", with: "http://x/").utf8)))
+        let good = #"{"issuer":"https://auth.example.org","authorization_endpoint":"https://auth.example.org/authorize/","token_endpoint":"https://auth.example.org/token/"}"#
+        XCTAssertEqual(Discovery.parse(Data(good.utf8))?.tokenEndpoint, "https://auth.example.org/token/")
+        XCTAssertNil(Discovery.parse(Data(good.replacingOccurrences(of: "https://auth.example.org/token/", with: "http://x/").utf8)))
         XCTAssertNil(Discovery.parse(Data("nope".utf8)))
         XCTAssertEqual(Discovery.url(issuer: "https://auth.example.org/")?.absoluteString, "https://auth.example.org/.well-known/openid-configuration")
     }
 
     func testAuthorizeURLAndCallback() {
-        let discovery = Discovery(json: ["authorization_endpoint": "https://auth.example.org/identity/o/authorize/"])
+        let discovery = Discovery(json: ["authorization_endpoint": "https://auth.example.org/authorize/"])
         let request = AuthorizeRequest(state: "st", nonce: "no", verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
         let url = request.url(discovery: discovery, client: client, scopes: "openid profile", uiLocales: "fr")!
         let items = Dictionary(uniqueKeysWithValues: URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!.map { ($0.name, $0.value!) })

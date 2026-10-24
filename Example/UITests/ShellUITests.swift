@@ -1,7 +1,7 @@
 import XCTest
 
 /// The shell's own screens as a person sees them, signed out, on the Simulator. The example app's site does not exist
-/// (`app.example.org`), which is what makes its page load fail into the native offline screen.
+/// (`app.example.org`, `auth.example.org`), which is what makes its loads fail into the native offline screens.
 final class ShellUITests: XCTestCase {
 
     override func setUp() {
@@ -27,15 +27,16 @@ final class ShellUITests: XCTestCase {
         }
     }
 
-    func testSignInOpensTheSystemSignInSheetNeverAWebPage() {
+    /// The example's account service does not exist either: signing in says so natively, with Try again.
+    func testSigningInWithoutTheAccountServiceSaysSoNatively() {
         let app = launch("en")
         app.buttons["shell.panel.button"].tap()
-        let prompt = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
-        XCTAssertTrue(prompt.waitForExistence(timeout: 30), "ASWebAuthenticationSession asks to use the account service's site")
-        XCTAssertTrue(prompt.buttons["Continue"].exists)
-        snapshot(self, "signin-sheet")
-        prompt.buttons["Cancel"].tap()
-        XCTAssertTrue(app.buttons["shell.panel.button"].waitForExistence(timeout: 15), "cancelled: back on the sign-in screen")
+        let text = app.staticTexts["shell.panel.text"]
+        let offline = NSPredicate(format: "label BEGINSWITH %@", "No connection")
+        expectation(for: offline, evaluatedWith: text)
+        waitForExpectations(timeout: 30)
+        XCTAssertEqual(app.buttons["shell.panel.button"].label, "Try again")
+        snapshot(self, "signin-offline")
     }
 
     func testAPageThatCannotLoadShowsTheNativeOfflineScreen() {

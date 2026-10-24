@@ -4,9 +4,9 @@ import Foundation
 public enum Renewal: Equatable {
     /// The site's session is open again (cookies in the web view's store): retry what failed.
     case renewed
-    /// the account service refused the refresh, or there was no token: the native sign-in screen.
+    /// The account service refused the refresh, or there was no token: the native sign-in screen.
     case signIn
-    /// the account service or the site out of reach: nothing was forgotten, try again later.
+    /// The account service or the site out of reach: nothing was forgotten, try again later.
     case offline
 }
 

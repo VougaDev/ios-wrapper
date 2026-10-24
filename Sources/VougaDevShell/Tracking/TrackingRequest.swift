@@ -1,6 +1,6 @@
 import Foundation
 
-/// The missions' addresses, exactly as the site writes them (Ship's `missions/urls.py`, `missions/api.py`):
+/// The missions' addresses, exactly as the site writes them:
 ///
 /// - `/courier/missions/`              the missions list;
 /// - `/courier/missions/<uuid>/`       one mission;

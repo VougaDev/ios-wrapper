@@ -1,11 +1,11 @@
 # VougaDev Native for iOS
 
-The native shell every VougaDev web app (Ship, PIVO, Jobs, Civis, Care…) ships as its own App Store app: the product's
+The native shell every VougaDev web app ships as its own App Store app: the product's
 site in a `WKWebView`, the sign-in in the system's sign-in sheet, a native offline screen, and the native features the
 site turns on. It is the Swift package `VougaDevShell` (iOS 17+). Its Android twin is
 [VougaDev/android-wrapper](https://github.com/VougaDev/android-wrapper); both expose the same `window.VougaDevNative`.
 
-The shell alone is never submitted: each app adds its own name, icon, site, the account service client and native features
+The shell alone is never submitted: each app adds its own name, icon, site, account-service client and native features
 ([App Review 4.2](#app-review-checks)).
 
 ## The contract: `window.VougaDevNative`
@@ -38,9 +38,9 @@ The same on Android and iOS; a page branches on the platform only through `platf
 
 | | |
 |---|---|
-| Sign-in | `ASWebAuthenticationSession` over the app ("<App> wants to use <sign-in domain> to sign in"), PKCE S256, the app's own public the account service client, never inside the web view. The access token is traded at `POST /auth/app-session/` for the site's session cookie; the refresh token stays in the Keychain (`AfterFirstUnlockThisDeviceOnly`) and renews a lost session silently, one renewal at a time. |
+| Sign-in | `ASWebAuthenticationSession` over the app ("<App> wants to use the account service's site to sign in"), PKCE S256, the app's own public client at the account service, never inside the web view. The access token is traded at `POST /auth/app-session/` for the site's session cookie; the refresh token stays in the Keychain (`AfterFirstUnlockThisDeviceOnly`) and renews a lost session silently, one renewal at a time. |
 | Sign-out | The web's `POST /auth/logout/` is taken over: the site's session ended, the refresh token revoked, cookies and web data cleared, tracking stopped. The VougaDev session in Safari stays (no `end_session`). |
-| Links | The app's pages inside; its sign-in pages run the native sign-in; the account service's account pages, other sites, `tel:`, `mailto:`, maps open outside; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. A same-origin path may open a native screen instead ([`nativeScreen(path:)`](Sources/VougaDevShell/Shell/ShellViewController.swift)). |
+| Links | The app's pages inside; its sign-in pages run the native sign-in; the account service's own pages, other sites, `tel:`, `mailto:`, maps open outside; `file:`, `javascript:`, `data:`, `blob:`, `about:` are blocked. A same-origin path may open a native screen instead ([`nativeScreen(path:)`](Sources/VougaDevShell/Shell/ShellViewController.swift)). |
 | Offline | A native screen (title, sentence, Try again) instead of a browser error, at launch too. |
 | Before sign-in | The sign-in screen links the site's privacy page (`privacyPath`, `/privacy/` by default; App Review 5.1.1). From there a visitor reads the site's public pages; their sign-in links come back to the native sign-in. |
 | Tracking (`.tracking`) | The disclosure first ([`TrackingDisclosure`](Sources/VougaDevShell/Tracking/TrackingStore.swift)), then Location Services, then While-Using permission (precise asked once more when only approximate is given). Positions are posted every `intervalSeconds` (15…300) to `/api/v1/courier/missions/<id>/position` with `{lat, lon, accuracy_m, fix_at_ms, distance_m}` as the web view's session, in the background too with the location indicator shown; never "Always". Stops on 404 or `not_on_the_road` / `not_started` / `not_your_mission` (after asking `/api/v1/courier/tracking` once for the next mission), on sign-out, on `stopTracking()` and after six hours. Resumed when the app comes back with a mission kept. |
@@ -58,7 +58,7 @@ The app's own repository holds an `ios/` folder: copy [Example](Example) and cha
 
 1. **`project.yml`** (XcodeGen; no `.xcodeproj` is committed): the package (`url: https://github.com/VougaDev/ios-wrapper`
    with an exact `revision`, so every release builds one known commit), the bundle id (the same id as the app on the
-   other store keeps one the account service redirect), the display name, `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`, and only the
+   other store keeps one redirect at the account service), the display name, `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`, and only the
    permissions its features use:
    - `.tracking`: `UIBackgroundModes: [location]`, `NSLocationWhenInUseUsageDescription`,
      `NSLocationTemporaryUsageDescriptionDictionary.Tracking`; never `NSLocationAlwaysAndWhenInUseUsageDescription`;
@@ -71,10 +71,11 @@ The app's own repository holds an `ios/` folder: copy [Example](Example) and cha
    ```swift
    extension ShellConfig {
        static let app = ShellConfig(
-           baseURL: "https://ship.vougadev.com",        // the only origin loaded or granted anything
+           baseURL: "https://app.example.org",          // the only origin loaded or granted anything
            authBaseURL: "https://auth.example.org",
-           authClientID: "<the app's public the account service client>", // PKCE, no secret; redirect <bundle id>:/oauth2redirect
+           authClientID: "<the app's public client id>", // PKCE, no secret; redirect <bundle id>:/oauth2redirect
            userAgentToken: "Ship",                         // " ShipApp/<version> (iOS)"
+           authSignInPaths: ["/authorize", "/login"],      // the account service's sign-in pages: native sign-in instead
            features: [.tracking, .missions],
            colors: ShellColors(background: …, text: …, muted: …, accent: …, onAccent: …)
        )
@@ -86,7 +87,7 @@ The app's own repository holds an `ios/` folder: copy [Example](Example) and cha
    (`nativeScreen(path:)`), append members to `super.bridgeMethods()` (each one in every platform's contract in the
    same release), and use the hooks `onSignedInPage`, `afterNewSignIn`, `beforeSignOut`, `forgetLocalData`. A subclass
    of `AppSession` clears what the app keeps (`beforeSessionEnds`, `afterSignOut`).
-6. **the account service**: register `<bundle id>:/oauth2redirect` on the app's client.
+6. **The account service**: register `<bundle id>:/oauth2redirect` on the app's client.
 7. **The site**: honour the user agent (no other platform, no download offer, no digital sale outside in-app purchase
    inside the iOS app), keep the privacy page and the account service's `/account/delete/` in the account menu.
 
@@ -172,7 +173,7 @@ Run the `store-rules` check before every submission. Where this shell stands:
 
 This repository is public. Firebase files (`GoogleService-Info.plist`), keys (`*.p8`, `*.p12`, `*.pem`), certificates,
 provisioning profiles, service-account JSON and `.env` files are git-ignored and never committed; CI uses encrypted
-secrets. An the account service client id is public by design (PKCE, no secret).
+secrets. An account-service client id is public by design (PKCE, no secret).
 
 ## License
 

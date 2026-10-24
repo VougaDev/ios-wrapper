@@ -2,7 +2,7 @@ import UIKit
 import VougaDevShell
 
 /// THE EXAMPLE APP: what an app built on the shell writes in its own repository (README.md, "An app on the shell").
-/// It builds in CI and is never submitted: a store app has its own site, name, icon, the account service client and native features.
+/// It builds in CI and is never submitted: a store app has its own site, name, icon, account-service client and native features.
 extension ShellConfig {
     static let app = ShellConfig(
         baseURL: "https://app.example.org",

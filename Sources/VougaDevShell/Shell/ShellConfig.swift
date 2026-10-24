@@ -45,6 +45,9 @@ public struct ShellConfig {
     public var features: Set<ShellFeature>
     public var colors: ShellColors
     public var scopes: String
+    /// The account service's authorization endpoint and sign-in pages, as path prefixes: met in the web view, they run
+    /// the native sign-in instead (its other pages open in Safari).
+    public var authSignInPaths: [String]
     /// The site's privacy page, linked from the sign-in screen (App Review 5.1.1); nil shows no link.
     public var privacyPath: String?
     /// Safari's Web Inspector may attach to the web view (debug builds only).
@@ -56,7 +59,7 @@ public struct ShellConfig {
     public init(baseURL: String, authBaseURL: String, authClientID: String, userAgentToken: String,
                 features: Set<ShellFeature> = [], colors: ShellColors = ShellColors(),
                 redirectURI: String? = nil, storeName: String? = nil, versionName: String? = nil,
-                scopes: String = ShellConfig.defaultScopes, privacyPath: String? = "/privacy/", inspectable: Bool = false) {
+                scopes: String = ShellConfig.defaultScopes, authSignInPaths: [String] = [], privacyPath: String? = "/privacy/", inspectable: Bool = false) {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.vougadev.app"
         self.baseURL = baseURL
         self.authBaseURL = authBaseURL
@@ -69,6 +72,7 @@ public struct ShellConfig {
         self.versionName = versionName ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0")
         self.scopes = scopes
         self.privacyPath = privacyPath
+        self.authSignInPaths = authSignInPaths
         self.inspectable = inspectable
     }
 }

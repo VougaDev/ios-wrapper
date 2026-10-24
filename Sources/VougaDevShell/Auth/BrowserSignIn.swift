@@ -1,7 +1,7 @@
 import AuthenticationServices
 import UIKit
 
-/// SIGN-IN IN THE SYSTEM'S SIGN-IN SHEET (`ASWebAuthenticationSession`, "<App> wants to use <sign-in domain> to sign
+/// SIGN-IN IN THE SYSTEM'S SIGN-IN SHEET (`ASWebAuthenticationSession`, "<App> wants to use the account service's site to sign
 /// in"), never in the web view: the authorization code flow with PKCE S256 for the app's public client, then the code
 /// exchange. The tokens go to the [SessionKeeper]. The sheet shares Safari's cookies (not ephemeral), so a person
 /// already signed in to VougaDev in Safari only confirms.
@@ -15,7 +15,7 @@ final class BrowserSignIn: NSObject, ASWebAuthenticationPresentationContextProvi
         /// The person closed the sheet: nothing happened.
         case cancelled
         case failed
-        /// the account service's discovery or token endpoint out of reach.
+        /// The account service's discovery or token endpoint out of reach.
         case offline
     }
 

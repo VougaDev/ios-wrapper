@@ -6,7 +6,7 @@ import WebKit
 /// turns on. An app subclasses it only to add its own: native screens for paths ([nativeScreen]), more bridge members
 /// ([bridgeMethods]) and the hooks below.
 ///
-/// SIGN-IN IS NATIVE, IN THE SYSTEM'S SIGN-IN SHEET (the account service's rule: never a web view). The app signs in with the account service
+/// SIGN-IN IS NATIVE, IN THE SYSTEM'S SIGN-IN SHEET (The account service's rule: never a web view). The app signs in with the account service
 /// ([BrowserSignIn]), trades the access token for the site's session (`/auth/app-session/`) and puts its cookies in the
 /// web view's store. When the web view heads for a sign-in (`/auth/login/`, the account service's pages) the session is renewed
 /// silently ([SessionKeeper]); only a refused refresh shows the sign-in screen, one button. The web's sign-out form is
@@ -192,7 +192,8 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             return signOut()
         }
         let screen = isSite ? path.flatMap { nativeScreen(path: $0) } : nil
-        switch LinkPolicy.decide(scheme: url.scheme, isSite: isSite, isAuth: auth.matches(url), isNativeRoute: screen != nil, path: path) {
+        switch LinkPolicy.decide(scheme: url.scheme, isSite: isSite, isAuth: auth.matches(url), isNativeRoute: screen != nil, path: path,
+                                  authSignInPaths: session.config.authSignInPaths) {
         case .loadInside:
             // A new window of the site's (`target="_blank"`) opens here: the app has one window.
             if action.targetFrame == nil {

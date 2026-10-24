@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// The app's the account service client: public (no secret), PKCE S256, its redirect a scheme of the app's own bundle id.
+/// The app's client at the account service: public (no secret), PKCE S256, its redirect a scheme of the app's own bundle id.
 public struct AuthClient: Sendable {
     public let issuer: String
     public let clientID: String
@@ -66,7 +66,7 @@ public struct AuthorizeRequest {
         self.verifier = verifier
     }
 
-    /// the account service's pages in the phone's language ([uiLocales]), as the web's own sign-in asks.
+    /// The account service's pages in the phone's language ([uiLocales]), as the web's own sign-in asks.
     public func url(discovery: Discovery, client: AuthClient, scopes: String, uiLocales: String) -> URL? {
         guard var parts = URLComponents(string: discovery.authorizationEndpoint) else { return nil }
         parts.queryItems = (parts.queryItems ?? []) + [
@@ -87,7 +87,7 @@ public struct AuthorizeRequest {
 
     public enum Callback: Equatable {
         case code(String)
-        /// the account service answered an error, or a redirect that is not this sign-in's (another state): nothing is trusted.
+        /// The account service answered an error, or a redirect that is not this sign-in's (another state): nothing is trusted.
         case failed
     }
 
@@ -103,7 +103,7 @@ public struct AuthorizeRequest {
 /// One token endpoint answer.
 public enum TokenAnswer: Equatable {
     case tokens(access: String, refresh: String?)
-    /// the account service said no (`invalid_grant`: revoked, expired or already spent): the person signs in again.
+    /// The account service said no (`invalid_grant`: revoked, expired or already spent): the person signs in again.
     case refused
     /// No network, or the account service out of reach: the token is kept for the next try.
     case unreachable
@@ -125,7 +125,7 @@ public protocol Refresher {
     func refresh(_ refreshToken: String) async -> TokenAnswer
 }
 
-/// the account service's token and revocation endpoints. [discovery] is read when a call is made, from the phone's copy.
+/// The account service's token and revocation endpoints. [discovery] is read when a call is made, from the phone's copy.
 public struct AuthEndpoints: Refresher {
     let client: AuthClient
     let transport: HttpTransport

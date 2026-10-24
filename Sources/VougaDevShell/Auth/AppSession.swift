@@ -60,10 +60,10 @@ open class AppSession {
         await Self.discovery(issuer: config.authBaseURL, defaults: defaults, transport: AppHttp.transport)
     }
 
-    /// the account service's discovery document, kept on the phone for a day; the account service out of reach, the phone's copy serves. Nil only before
+    /// The account service's discovery document, kept on the phone for a day; the account service out of reach, the phone's copy serves. Nil only before
     /// a first successful read.
     nonisolated static func discovery(issuer: String, defaults: UserDefaults, transport: HttpTransport) async -> Discovery? {
-        // Per issuer: a document kept for one the account service never answers for another.
+        // Per issuer: a document kept for one account service never answers for another.
         let key = "discovery." + issuer
         let kept = Discovery.parse(defaults.data(forKey: key))
         if let kept, Date().timeIntervalSince1970 - defaults.double(forKey: key + ".at") < 24 * 3600 { return kept }
