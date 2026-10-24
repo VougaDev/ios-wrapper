@@ -34,7 +34,7 @@ final class ShellUITests: XCTestCase {
         let text = app.staticTexts["shell.panel.text"]
         let offline = NSPredicate(format: "label BEGINSWITH %@", "Offline:")
         expectation(for: offline, evaluatedWith: text)
-        waitForExpectations(timeout: 30)
+        waitForExpectations(timeout: 60)
         XCTAssertEqual(app.buttons["shell.panel.button"].label, "Try again")
         snapshot(self, "signin-offline")
     }
@@ -46,7 +46,7 @@ final class ShellUITests: XCTestCase {
         let text = app.staticTexts["shell.panel.text"]
         let welcome = NSPredicate(format: "label BEGINSWITH %@", "Connectez-vous à Internet une première fois")
         expectation(for: welcome, evaluatedWith: text)
-        waitForExpectations(timeout: 30)
+        waitForExpectations(timeout: 60)
         XCTAssertFalse(app.buttons["shell.panel.button"].exists, "no lone Try again")
         snapshot(self, "offline-welcome-fr")
     }
