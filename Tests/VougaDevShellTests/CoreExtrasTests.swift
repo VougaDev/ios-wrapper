@@ -130,6 +130,10 @@ final class OfflinePagesTests: XCTestCase {
         XCTAssertTrue(pages.entries.isEmpty)
         XCTAssertEqual(OfflinePages.title("Votre colis ne voyage plus au hasard · Ship", appName: "Ship"), "Votre colis ne voyage plus au hasard")
         XCTAssertEqual(OfflinePages.title(" Confidentialité ", appName: "Ship"), "Confidentialité")
+        XCTAssertEqual(OfflinePages.name(screen: "Accueil", title: "Votre colis ne voyage plus au hasard · Ship", path: "/", appName: "Ship"), "Accueil")
+        XCTAssertEqual(OfflinePages.name(screen: "", title: "Votre colis ne voyage plus au hasard · Ship", path: "/", appName: "Ship"), "",
+                       "the root screen without a name: the list says Home")
+        XCTAssertEqual(OfflinePages.name(screen: " ", title: "Confidentialité · Ship", path: "/privacy/", appName: "Ship"), "Confidentialité")
     }
 }
 

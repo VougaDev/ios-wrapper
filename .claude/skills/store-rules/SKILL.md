@@ -78,8 +78,17 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
     home indicator;
   - dialogs on a phone are bottom sheets or full-screen, with the main action at the bottom within thumb reach;
   - no web words (the table above), no "open in a new tab", no browser-only gestures;
+  - **no scrollbar ever visible** (Echo, 2026-10-25): the page, its modals, sheets, menus and scrolling lists keep
+    scrolling but hide their bars (`scrollbar-width: none` and `::-webkit-scrollbar { display: none }`); a scrollbar
+    or its arrows is a website showing through;
+  - **no site footer**: the footer (legal links, "about", social links, language, copyright) is hidden when the app's
+    user agent or `VougaDevNative` is present; what the person needs from it lives in "Privacy and data" and the
+    native Settings;
   - every company page, error pages included, carries `<meta name="vougadev-page" content="<service>">` in its head:
     the shells treat a main-frame answer from a trusted origin without it as an edge or CDN error (offline handling);
+  - a page whose title is not a screen name (a home whose title is a slogan for search engines) says its name in
+    `<meta name="vougadev-screen" content="Accueil">`. The shells list saved screens by it, or else by the title
+    without " · <App>"; never by a slogan;
   - they read the app's user agent (` <App>App/<version> (Android|iOS)`) to adapt layout and wording, server-side and
     inside iframes alike. They use `VougaDevNative` (where injected) only for actions.
 - **An outside step that must leave the WebView** (PayPal, a bank's 3-D Secure, an operator's page that refuses
@@ -220,6 +229,9 @@ Report each line as done, failed and fixed, or skipped (with why). Never say "co
    - Fail with the iOS user agent if a page sells a digital feature, unless through in-app purchase.
    - Fail with either user agent if "Privacy and data" (policy, account deletion, notification settings) is more than
      about 3 taps away, if a page shows an install prompt, or if the site's cookie banner appears in the app.
+   - Fail with either user agent if a page, a modal or a list shows a scrollbar (screenshot each page with its
+     modals open, at 360 and 412 px; `getComputedStyle(el).scrollbarWidth` is `none` on every scrolling element), or
+     if the site's footer is visible.
 2. **Native texts and in-app words.** Grep every catalogue (en, fr, es), native and the site's, for web vocabulary:
    `page|página|site|web|navigateur|navegador|browser|cliqu|click|clic|lien|link|enlace|URL|recharg|reload|recarg|onglet|tab`.
    Every hit shown inside the app is reworded; SMS and e-mail texts with a URL may stay. Grep the native resources for

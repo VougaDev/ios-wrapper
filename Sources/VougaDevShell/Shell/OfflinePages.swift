@@ -85,13 +85,25 @@ public final class OfflinePages {
     func save(_ webView: WKWebView, url: URL) async {
         let shown = { webView.url.map(Self.normalized) == Self.normalized(url) }
         guard shown() else { return }
-        let read = (try? await webView.evaluateJavaScript("document.title")) as? String
-        let title = Self.title(read ?? webView.title ?? "", appName: ShellStrings.appName())
+        // The screen's own name (`<meta name="vougadev-screen">`) when the page gives one, else its title.
+        let script = "[(document.querySelector('meta[name=\"vougadev-screen\"]') || {}).content || '', document.title]"
+        let read = (try? await webView.evaluateJavaScript(script)) as? [String] ?? []
+        let title = Self.name(screen: read.first ?? "", title: read.count > 1 ? read[1] : (webView.title ?? ""),
+                              path: URLComponents(url: url, resolvingAgainstBaseURL: false)?.path ?? "", appName: ShellStrings.appName())
         let data: Data? = await withCheckedContinuation { done in
             webView.createWebArchiveData { result in done.resume(returning: try? result.get()) }
         }
         guard let data, shown() else { return }
         store(data, url: url, title: title)
+    }
+
+    /// What a saved screen is called in the list: its `vougadev-screen` name; else, for the root screen, nothing (the
+    /// list says "Home"); else its title without the site's ending.
+    nonisolated static func name(screen: String, title: String, path: String, appName: String) -> String {
+        let given = screen.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !given.isEmpty { return given }
+        if path == "/" || path.isEmpty { return "" }
+        return Self.title(title, appName: appName)
     }
 
     /// A page's title as the person reads it in a list: without the site's " · <App>" ending.
