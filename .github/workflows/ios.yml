@@ -28,7 +28,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -list
-          xcodebuild test -scheme VougaDevShell -destination "platform=iOS Simulator,id=$SIMULATOR" \
+          xcodebuild test -scheme VougaDevShell-Package -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -resultBundlePath build/tests.xcresult | tee build-tests.log | grep -E "error:|warning:|Test Case|Executed|\*\* TEST" || true
           grep -q "\*\* TEST SUCCEEDED \*\*" build-tests.log
       - name: Example app and its UI tests on the Simulator

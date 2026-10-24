@@ -1,14 +1,5 @@
 import UIKit
 
-/// The native features an app turns on. Each adds its members to `window.VougaDevNative`, in the contract's order.
-public enum ShellFeature: String, CaseIterable, Sendable {
-    /// `startTracking`, `stopTracking`, `trackingState`: the mission's position shared in the background, with the
-    /// disclosure first. Needs `UIBackgroundModes = [location]` and the location purpose strings.
-    case tracking
-    /// `openMissions`: the missions' pages, on the app's native screen when it has one ([ShellViewController.nativeScreen]).
-    case missions
-}
-
 /// The colours of the shell's own screens (sign-in, offline). Dynamic colours follow the system's dark mode.
 public struct ShellColors {
     public var background: UIColor
@@ -42,14 +33,19 @@ public struct ShellConfig {
     public var userAgentToken: String
     public var versionName: String
     public var storeName: String
-    public var features: Set<ShellFeature>
     public var colors: ShellColors
     public var scopes: String
     /// The account service's authorization endpoint and sign-in pages, as path prefixes: met in the web view, they run
     /// the native sign-in instead (its other pages open in Safari).
     public var authSignInPaths: [String]
-    /// The site's privacy page, linked from the sign-in screen (App Review 5.1.1); nil shows no link.
+    /// The site's privacy page: on the sign-in screen and in Settings, "Privacy and data" (App Review 5.1.1).
     public var privacyPath: String?
+    /// The account service's page that deletes the account (App Review 5.1.1(v)), in Settings, "Privacy and data".
+    public var accountDeletionURL: String?
+    /// Push notifications through the hub; nil: none, and the permission is never asked.
+    public var push: ShellPush.Settings?
+    /// The purposes the site asks consent for; nil: no consent dialog.
+    public var consent: ShellConsent.Settings?
     /// Safari's Web Inspector may attach to the web view (debug builds only).
     public var inspectable: Bool
 
@@ -57,15 +53,16 @@ public struct ShellConfig {
     public static let defaultScopes = "openid profile email phone permissions"
 
     public init(baseURL: String, authBaseURL: String, authClientID: String, userAgentToken: String,
-                features: Set<ShellFeature> = [], colors: ShellColors = ShellColors(),
+                colors: ShellColors = ShellColors(),
                 redirectURI: String? = nil, storeName: String? = nil, versionName: String? = nil,
-                scopes: String = ShellConfig.defaultScopes, authSignInPaths: [String] = [], privacyPath: String? = "/privacy/", inspectable: Bool = false) {
+                scopes: String = ShellConfig.defaultScopes, authSignInPaths: [String] = [], privacyPath: String? = "/privacy/",
+                accountDeletionURL: String? = nil, push: ShellPush.Settings? = nil, consent: ShellConsent.Settings? = nil,
+                inspectable: Bool = false) {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.vougadev.app"
         self.baseURL = baseURL
         self.authBaseURL = authBaseURL
         self.authClientID = authClientID
         self.userAgentToken = userAgentToken
-        self.features = features
         self.colors = colors
         self.redirectURI = redirectURI ?? "\(bundleID):/oauth2redirect"
         self.storeName = storeName ?? bundleID
@@ -73,20 +70,34 @@ public struct ShellConfig {
         self.scopes = scopes
         self.privacyPath = privacyPath
         self.authSignInPaths = authSignInPaths
+        self.accountDeletionURL = accountDeletionURL
+        self.push = push
+        self.consent = consent
         self.inspectable = inspectable
     }
 }
 
-/// The shell's texts in the phone's language (en, fr, es). An app rewords any of them in its own `Shell.strings`
-/// (the sign-in sentence, above all), which is read first.
-enum Strings {
-    static func text(_ key: String) -> String {
-        let fallback = NSLocalizedString(key, bundle: .module, comment: "")
+/// The shell's and its extensions' texts in the phone's language (en, fr, es). An app rewords any of them in its own
+/// `Shell.strings` (the sign-in sentence, the notifications sentence), which is read first.
+public enum ShellStrings {
+    public static func text(_ key: String, bundle: Bundle) -> String {
+        let fallback = NSLocalizedString(key, bundle: bundle, comment: "")
         return NSLocalizedString(key, tableName: "Shell", bundle: .main, value: fallback, comment: "")
     }
 
-    static func appName() -> String {
+    public static func appName() -> String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? ""
     }
+}
+
+/// The core's own texts.
+enum Strings {
+    static func text(_ key: String) -> String { ShellStrings.text(key, bundle: .module) }
+    static func appName() -> String { ShellStrings.appName() }
+}
+
+/// The core's resource bundle (its texts), for tests and tools.
+public enum ShellResources {
+    public static let bundle = Bundle.module
 }

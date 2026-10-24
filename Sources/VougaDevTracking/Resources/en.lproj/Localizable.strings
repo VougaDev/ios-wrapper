@@ -1,0 +1,5 @@
+/* The disclosure shown before the first position sharing. %@ is the app's name. */
+"tracking_disclosure_title" = "Position sharing during a mission";
+"tracking_disclosure_text" = "While a mission is under way, %@ collects your position about once a minute, even when the app is in the background or not in use, to tell the people waiting that you are on the way and to prove where each handover took place. The sharing stops when the mission ends, when you sign out, and after six hours at most. The location indicator shows it the whole time.";
+"tracking_disclosure_accept" = "I agree";
+"tracking_disclosure_decline" = "Not now";

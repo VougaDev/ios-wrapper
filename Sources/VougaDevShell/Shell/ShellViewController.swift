@@ -16,7 +16,7 @@ import WebKit
 /// Only the app's origin is ever loaded or granted anything ([AppOrigin]). `window.VougaDevNative` is injected there
 /// only ([NativeShim], [NativeBridge]).
 @MainActor
-open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
+open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, ShellHost {
 
     public let session: AppSession
     public var origin: AppOrigin { session.origin }
@@ -24,11 +24,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     public private(set) var webView: WKWebView!
     private lazy var panel = ShellPanel(colors: session.config.colors)
     private lazy var browser = BrowserSignIn(session: session)
-    private lazy var startFlow: TrackingStartFlow? = session.tracking.map {
-        TrackingStartFlow(phone: LocationPhone(service: $0, presenter: self))
-    }
-
-    private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlinePage }
+    private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlinePage, askPush }
 
     private var screen: Screen?
     /// The page to open once the session is open (the sign-in's `next`).
@@ -37,7 +33,6 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// The URL whose main-frame load failed, reloaded by Try again.
     private var failedURL: URL?
     private var booted = false
-    private var trackingAsked = false
 
     public init(session: AppSession) {
         self.session = session
@@ -50,13 +45,24 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
 
     // MARK: - What the app adds
 
-    /// The members of `window.VougaDevNative` beyond `platform()` and `version()`, in the order the contract lists them:
-    /// by default those of the features turned on. A subclass appends its own to `super`'s.
-    open func bridgeMethods() -> [(String, NativeBridge.Method)] { featureMethods() }
+    /// The members of `window.VougaDevNative` beyond `platform()`, `version()` and `features()`: the core's
+    /// (`openSettings`, `consent`), then each extension's, in the order the app lists its extensions.
+    open func bridgeMethods() -> [(String, NativeBridge.Method)] {
+        coreMethods() + session.extensions.flatMap { $0.bridgeMethods(host: self) }
+    }
 
     /// The native screen a same-origin [path] (no query, trailing slash kept) opens instead of loading it, or nil to
-    /// load it in the web view. Fixed in the binary (App Review 2.5.2): the server never chooses what is native.
-    open func nativeScreen(path: String) -> UIViewController? { nil }
+    /// load it in the web view: the first extension that claims it. Fixed in the binary (App Review 2.5.2).
+    open func nativeScreen(path: String) -> UIViewController? {
+        session.extensions.lazy.compactMap { $0.nativeScreen(path: path, host: self) }.first
+    }
+
+    /// The controller dialogs and native screens are presented from: the topmost one shown.
+    public var presenter: UIViewController {
+        var top: UIViewController = self
+        while let shown = top.presentedViewController { top = shown }
+        return top
+    }
 
     /// A page of the site finished loading with the session open.
     open func onSignedInPage() {}
@@ -79,7 +85,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         panel.translatesAutoresizingMaskIntoConstraints = false
         panel.isHidden = true
         panel.onButton = { [weak self] in self?.onPanelButton() }
-        panel.onLink = { [weak self] in self?.openPrivacy() }
+        panel.onLink = { [weak self] in self?.onPanelLink() }
         view.addSubview(panel)
         NSLayoutConstraint.activate([
             panel.topAnchor.constraint(equalTo: view.topAnchor),
@@ -88,8 +94,13 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             panel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.session.tracking?.resumeIfPending() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.session.extensions.forEach { $0.becameActive(host: self) }
+            }
         }
+        // A tapped notification; one that arrived before this screen existed (a cold start) is handed over now.
+        session.push?.onRoute = { [weak self] in self?.route($0) }
     }
 
     open override func viewDidAppear(_ animated: Bool) {
@@ -111,7 +122,13 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             return
         }
         Task {
-            if SessionCookies.isSignedIn(await session.cookies.jar()) { open(home) } else { renewThen(nil) }
+            if SessionCookies.isSignedIn(await session.cookies.jar()) {
+                let target = afterSignIn ?? home
+                afterSignIn = nil
+                open(target)
+            } else {
+                renewThen(nil)
+            }
         }
     }
 
@@ -126,6 +143,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         config.allowsInlineMediaPlayback = true
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         installNativeBridge(config.userContentController)
+        session.extensions.forEach { $0.configure(config) }
 
         let web = WKWebView(frame: .zero, configuration: config)
         web.navigationDelegate = self
@@ -162,13 +180,20 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     private func installNativeBridge(_ controller: WKUserContentController) {
         let methods = bridgeMethods()
         let bridge = NativeBridge(origin: origin, methods: Dictionary(methods, uniquingKeysWith: { first, _ in first }))
-        let script = NativeShim.script(origin: origin, version: session.config.versionName, methods: methods.map { $0.0 })
+        let script = NativeShim.script(origin: origin, version: session.config.versionName, features: session.features,
+                                       methods: methods.map { $0.0 })
         controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         controller.addScriptMessageHandler(BridgeHandler(bridge), contentWorld: .page, name: NativeShim.handler)
     }
 
-    /// A page by URL: a native screen opens over the home page; anything else loads here.
+    /// A page by URL: a native screen opens over the home page; anything else loads here. With consent purposes
+    /// declared, the dialog comes first (once), and its cookie is set before any page loads.
     public func open(_ url: String) {
+        guard let consent = session.consent else { return load(url) }
+        consent.ask(from: presenter) { [weak self] in self?.load(url) }
+    }
+
+    private func load(_ url: String) {
         guard let target = URL(string: url) else { return }
         if origin.matches(target), let path = routePath(target), let screen = nativeScreen(path: path) {
             if webView.url == nil { webView.load(URLRequest(url: URL(string: home)!)) }
@@ -307,6 +332,9 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         case .offlinePage:
             panel.show(title: Strings.text("shell_load_error_title"), text: Strings.text("shell_load_error_text"),
                        button: Strings.text("shell_load_error_retry"))
+        case .askPush:
+            panel.show(title: name, text: Strings.text("shell_push_text"), button: Strings.text("shell_push_continue"),
+                       link: Strings.text("shell_push_later"))
         }
     }
 
@@ -332,7 +360,22 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         case .offlinePage:
             hidePanel()
             webView.load(URLRequest(url: failedURL ?? URL(string: home)!))
+        case .askPush:
+            show(.working)
+            Task {
+                await session.push?.requestPermission()
+                openAfterSignIn()
+            }
         default: break
+        }
+    }
+
+    private func onPanelLink() {
+        if screen == .askPush {
+            session.push?.markAsked()
+            openAfterSignIn()
+        } else {
+            openPrivacy()
         }
     }
 
@@ -371,15 +414,21 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
-    /// The site's session is in the store: the page asked for (or home), and the app's [afterNewSignIn].
+    /// The site's session is in the store: the page asked for (or home), and the app's [afterNewSignIn]. Right after a
+    /// new sign-in, notifications are asked once, with one sentence first (never at launch, never a condition).
     private func sessionOpen(newSignIn: Bool) {
-        hidePanel()
-        let target = afterSignIn ?? home
-        afterSignIn = nil
         if newSignIn {
             replaceWebView()
             afterNewSignIn()
+            if let push = session.push, !push.asked { return show(.askPush) }
         }
+        openAfterSignIn()
+    }
+
+    private func openAfterSignIn() {
+        hidePanel()
+        let target = afterSignIn ?? home
+        afterSignIn = nil
         open(target)
     }
 
@@ -391,12 +440,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         signingOut = true
         show(.signingOut)
         beforeSignOut()
-        startFlow?.abandon()
         Task {
             await session.signOut()
             await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
             signingOut = false
-            trackingAsked = false
             replaceWebView()
             afterSignIn = nil
             forgetLocalData()
@@ -405,50 +452,53 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     }
 
     private func signedInPage() {
-        followTracking()
+        session.push?.refreshRegistration()
+        session.extensions.forEach { $0.signedInPage(host: self) }
         onSignedInPage()
     }
 
-    // MARK: - Features
+    // MARK: - Notifications
 
-    /// THE MISSION TO SHARE THE POSITION FOR, asked once per sign-in ([TrackingTarget]): a started mission the server
-    /// names is tracked (when precise location is held and on), tracking the server no longer has a mission for stops.
-    /// A person who is not a courier is answered 404, and nothing happens.
-    private func followTracking() {
-        guard let tracking = session.tracking, !trackingAsked else { return }
-        trackingAsked = true
-        Task {
-            if case let .ok(body) = await session.caller().get(TrackingTarget.path) { await tracking.follow(body) }
+    /// A tapped notification ([NotificationRoute]): a native screen an extension claims, this app's page, or another
+    /// app's page through the system. Signed out or not ready yet, this app's page waits for the session.
+    private func route(_ route: NotificationRoute) {
+        switch route {
+        case let .screen(key, fallback):
+            if let claimed = session.extensions.lazy.compactMap({ $0.notificationScreen(key: key, url: fallback, host: self) }).first {
+                presenter.present(claimed, animated: true)
+            } else {
+                openWhenReady(fallback?.absoluteString ?? home)
+            }
+        case let .page(url): openWhenReady(url.absoluteString)
+        case let .outside(url): UIApplication.shared.open(url)
+        case .home: openWhenReady(home)
         }
     }
 
-    private func featureMethods() -> [(String, NativeBridge.Method)] {
-        var methods: [(String, NativeBridge.Method)] = []
-        if let tracking = session.tracking {
-            methods.append(("startTracking", { [weak self] args, answer in
-                switch TrackingRequest.parse(args) {
-                case let .refused(reason): answer(NativeBridge.refused(reason))
-                case let .accepted(request):
-                    guard let flow = self?.startFlow else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
-                    flow.submit(request) { error in answer(error.map(NativeBridge.refused) ?? NativeBridge.ok()) }
-                }
-            }))
-            methods.append(("stopTracking", { _, answer in
-                tracking.stop()
+    private func openWhenReady(_ url: String) {
+        if booted && screen == nil { open(url) } else { afterSignIn = url }
+    }
+
+    // MARK: - The core's members
+
+    private func coreMethods() -> [(String, NativeBridge.Method)] {
+        [
+            ("openSettings", { [weak self] _, answer in
+                guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
+                self.openSettings()
                 answer(NativeBridge.ok())
-            }))
-            methods.append(("trackingState", { _, answer in answer(tracking.state()) }))
-        }
-        if session.config.features.contains(.missions) {
-            methods.append(("openMissions", { [weak self] args, answer in
-                guard let self, let path = MissionRoute.page(forBridgeURL: args?["url"] as? String) else {
-                    return answer(NativeBridge.refused(MissionRoute.refusedRoute))
-                }
-                self.open(self.origin.baseURL + path)
-                answer(NativeBridge.ok())
-            }))
-        }
-        return methods
+            }),
+            ("consent", { [weak self] _, answer in
+                answer(self?.session.consent?.state() ?? ["asked": false, "choices": [String: Bool]()])
+            }),
+        ]
+    }
+
+    /// The app's native Settings ([SettingsViewController]).
+    public func openSettings() {
+        let settings = SettingsViewController(session: session, openPage: { [weak self] in self?.open($0) },
+                                              signOut: { [weak self] in self?.signOut() })
+        presenter.present(UINavigationController(rootViewController: settings), animated: true)
     }
 }
 

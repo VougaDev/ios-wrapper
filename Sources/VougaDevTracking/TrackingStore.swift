@@ -1,4 +1,5 @@
 import Foundation
+import VougaDevShell
 
 /// The mission being tracked, kept on the phone so an app the courier reopens after the system ended it carries on
 /// with the same mission.
@@ -8,17 +9,21 @@ import Foundation
 /// mission starts.
 public final class TrackingStore {
     let defaults: UserDefaults
+    let paths: TrackingPaths
 
     public struct Active: Equatable {
         public let request: TrackingRequest
         public let startedAt: Date
     }
 
-    public init(defaults: UserDefaults) { self.defaults = defaults }
+    public init(defaults: UserDefaults, paths: TrackingPaths) {
+        self.defaults = defaults
+        self.paths = paths
+    }
 
     public func load() -> Active? {
         guard let json = defaults.string(forKey: Keys.request) else { return nil }
-        guard case let .accepted(request) = TrackingRequest.parse(json: json) else {
+        guard case let .accepted(request) = TrackingRequest.parse(json: json, paths: paths) else {
             // Written by a build with another shape: not ours to resume.
             clearRequest()
             return nil
@@ -64,7 +69,7 @@ public final class TrackingStore {
 
     /// `trackingState()`: `{active, missionId, lastSentAt, lastError}`. [running] is the mission tracked right now.
     public func state(running: String?) -> JSONObject {
-        let kept = defaults.string(forKey: Keys.request).flatMap { TrackingRequest.parse(json: $0).request?.missionID }
+        let kept = defaults.string(forKey: Keys.request).flatMap { TrackingRequest.parse(json: $0, paths: paths).request?.missionID }
         let missionID = running ?? kept ?? defaults.string(forKey: Keys.outcomeMission)
         let sentAt = defaults.object(forKey: Keys.lastSentAt) as? NSNumber
         return [

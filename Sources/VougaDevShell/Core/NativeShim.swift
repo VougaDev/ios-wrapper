@@ -6,9 +6,10 @@ import Foundation
 /// ```
 /// VougaDevNative.platform()            -> "ios"                      (sync, a constant)
 /// VougaDevNative.version()             -> "1.0.0"                    (sync, CFBundleShortVersionString)
+/// VougaDevNative.features()            -> ["tracking", "push", …]    (sync, the extensions present)
 /// ```
 ///
-/// The others are the members of the features the app turns on, each
+/// The others are the core's (`openSettings`, `consent`) and those of the extensions the app has, each
 /// `name(args) -> Promise<{ok: true, ...} | {ok: false, error}>`. A Promise always resolves, never rejects. The object
 /// is frozen and cannot be replaced.
 ///
@@ -31,15 +32,16 @@ public enum NativeShim {
     public static let errorInvalidRequest = "invalid_request"
 
     /// The members every app has, before its own.
-    public static let builtIn = ["platform", "version"]
+    public static let builtIn = ["platform", "version", "features"]
 
     /// [version] is the app's version name and [origin] its origin, both written as JSON string literals so they cannot
     /// break out of them; [methods] are the app's members, in the order its contract lists them (plain identifiers only).
-    public static func script(origin: AppOrigin, version: String, methods: [String]) -> String {
+    public static func script(origin: AppOrigin, version: String, features: [String], methods: [String]) -> String {
         precondition(
             methods.allSatisfy(isMethodName) && methods.allSatisfy { !builtIn.contains($0) } && Set(methods).count == methods.count,
             "Bridge members must be distinct identifiers other than \(builtIn): \(methods)"
         )
+        let featureList = "[" + features.map(quote).joined(separator: ", ") + "]"
         let members = methods.map { ",\n    \($0): function (args) { return call(\"\($0)\", args); }" }.joined()
         return """
         (function () {
@@ -49,6 +51,7 @@ public enum NativeShim {
           var handlers = window.webkit && window.webkit.messageHandlers;
           var h = handlers ? handlers.\(handler) : null;
           var unavailable = { ok: false, error: \(quote(errorUnavailable)) };
+          var features = Object.freeze(\(featureList));
           function call(method, args) {
             return new Promise(function (resolve) {
               if (!h || typeof h.postMessage !== "function") { resolve(unavailable); return; }
@@ -66,7 +69,8 @@ public enum NativeShim {
           }
           var api = Object.freeze({
             platform: function () { return \(quote(platform)); },
-            version: function () { return \(quote(version)); }\(members)
+            version: function () { return \(quote(version)); },
+            features: function () { return features.slice(); }\(members)
           });
           Object.defineProperty(window, \(quote(name)), { value: api, writable: false, enumerable: false, configurable: false });
         })();

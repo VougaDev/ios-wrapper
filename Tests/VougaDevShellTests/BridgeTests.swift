@@ -1,15 +1,18 @@
 import UIKit
 import XCTest
 @testable import VougaDevShell
+@testable import VougaDevTracking
 
 final class BridgeTests: XCTestCase {
 
     func testScriptChecksTheOriginAndListsTheMembers() {
-        let script = NativeShim.script(origin: origin, version: "1.0\"; alert(1); \"", methods: ["startTracking", "openMissions"])
+        let script = NativeShim.script(origin: origin, version: "1.0\"; alert(1); \"", features: ["tracking", "offline-map"], methods: ["startTracking", "openSettings"])
         XCTAssertTrue(script.contains(#"if (window.location.origin !== "https:\/\/app.example.org") { return; }"#))
         XCTAssertTrue(script.contains(#"platform: function () { return "ios"; }"#))
         XCTAssertTrue(script.contains(#"return "1.0\"; alert(1); \"";"#), "the version cannot break out of its literal")
         XCTAssertTrue(script.contains(#"startTracking: function (args) { return call("startTracking", args); }"#))
+        XCTAssertTrue(script.contains(#"var features = Object.freeze(["tracking", "offline-map"]);"#))
+        XCTAssertTrue(script.contains("features: function () { return features.slice(); }"))
         XCTAssertTrue(script.contains("Object.freeze"))
         XCTAssertTrue(script.contains("writable: false"))
         XCTAssertTrue(script.contains("window.webkit.messageHandlers"))
@@ -61,8 +64,13 @@ final class BridgeTests: XCTestCase {
     @MainActor
     func testTheControllerAnswersWebKitsDelegateSelectors() {
         let config = ShellConfig(baseURL: "https://app.example.org", authBaseURL: "https://auth.example.org",
-                                 authClientID: "test-client", userAgentToken: "Test", features: [.tracking, .missions])
-        let controller = ShellViewController(session: AppSession(config: config))
+                                 authClientID: "test-client", userAgentToken: "Test",
+                                 push: ShellPush.Settings(appSlug: "test"))
+        let tracking = TrackingExtension(paths: paths)
+        let session = AppSession(config: config, extensions: [tracking])
+        XCTAssertNotNil(tracking.service, "attached to the session")
+        XCTAssertEqual(session.features, ["tracking", "push"])
+        let controller = ShellViewController(session: session)
         for selector in [
             "webView:decidePolicyForNavigationAction:decisionHandler:",
             "webView:didCommitNavigation:",
@@ -76,6 +84,12 @@ final class BridgeTests: XCTestCase {
         ] {
             XCTAssertTrue(controller.responds(to: NSSelectorFromString(selector)), selector)
         }
-        XCTAssertEqual(controller.bridgeMethods().map { $0.0 }, ["startTracking", "stopTracking", "trackingState", "openMissions"])
+        XCTAssertEqual(controller.bridgeMethods().map { $0.0 }, ["openSettings", "consent", "startTracking", "stopTracking", "trackingState"])
+        XCTAssertEqual(AppSession.missingRequirements([tracking], info: [:]),
+                       ["NSLocationWhenInUseUsageDescription", "UIBackgroundModes: location", "NSLocationTemporaryUsageDescriptionDictionary: Tracking"])
+        XCTAssertEqual(AppSession.missingRequirements([tracking], info: [
+            "NSLocationWhenInUseUsageDescription": "why", "UIBackgroundModes": ["location"],
+            "NSLocationTemporaryUsageDescriptionDictionary": ["Tracking": "why"],
+        ]), [])
     }
 }

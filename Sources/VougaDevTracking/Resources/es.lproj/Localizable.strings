@@ -1,0 +1,5 @@
+/* La información que se muestra antes del primer uso compartido de la ubicación. %@ es el nombre de la aplicación. */
+"tracking_disclosure_title" = "Ubicación compartida durante una misión";
+"tracking_disclosure_text" = "Mientras una misión está en curso, %@ recoge su ubicación aproximadamente una vez por minuto, incluso cuando la aplicación está en segundo plano o no se está usando, para avisar a las personas que esperan de que va en camino y para acreditar el lugar de cada entrega. El uso compartido se detiene cuando termina la misión, cuando cierra la sesión y, como máximo, a las seis horas. El indicador de ubicación lo muestra durante todo ese tiempo.";
+"tracking_disclosure_accept" = "Acepto";
+"tracking_disclosure_decline" = "Ahora no";

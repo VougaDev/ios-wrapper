@@ -13,8 +13,29 @@
 "shell_ok" = "OK";
 "shell_cancel" = "Cancel";
 
-/* The disclosure shown before the first position sharing. %@ is the app's name. */
-"tracking_disclosure_title" = "Position sharing during a mission";
-"tracking_disclosure_text" = "While a mission is under way, %@ collects your position about once a minute, even when the app is in the background or not in use, to tell the people waiting that you are on the way and to prove where each handover took place. The sharing stops when the mission ends, when you sign out, and after six hours at most. The location indicator shows it the whole time.";
-"tracking_disclosure_accept" = "I agree";
-"tracking_disclosure_decline" = "Not now";
+/* Notifications, asked once right after sign-in. An app says what it sends in its own Shell.strings. */
+"shell_push_text" = "Allow notifications to hear about what concerns you as soon as it happens. You choose the topics in Settings.";
+"shell_push_continue" = "Continue";
+"shell_push_later" = "Not now";
+
+/* The consent dialog. */
+"consent_title" = "Cookies and data";
+"consent_text" = "With your agreement, the site also uses:";
+"consent_accept" = "I agree";
+"consent_refuse" = "Only what is needed";
+
+/* Settings. */
+"settings_title" = "Settings";
+"settings_app" = "Application";
+"settings_version" = "Version";
+"settings_notifications" = "Notifications";
+"settings_notifications_permission" = "Allow notifications";
+"settings_notifications_on" = "On";
+"settings_notifications_off" = "Off";
+"settings_notifications_topics" = "Choose the notifications";
+"settings_privacy" = "Privacy and data";
+"settings_privacy_policy" = "Privacy policy";
+"settings_consent" = "Cookies and data";
+"settings_delete_account" = "Delete my account";
+"settings_sign_out" = "Sign out";
+"settings_sign_out_confirm" = "Sign out of %@ on this phone?";

@@ -1,5 +1,6 @@
 import CoreLocation
 import UIKit
+import VougaDevShell
 
 /// What the start flow needs of the phone; [LocationPhone] in the app, a fake in the tests. Every `then` is called on
 /// the main thread, once, after the person answered.
@@ -133,12 +134,12 @@ final class LocationPhone: NSObject, TrackingPhone, CLLocationManagerDelegate {
         guard var top = presenter else { return then(false) }
         while let shown = top.presentedViewController { top = shown }
         let alert = UIAlertController(
-            title: Strings.text("tracking_disclosure_title"),
-            message: String(format: Strings.text("tracking_disclosure_text"), Strings.appName()),
+            title: ShellStrings.text("tracking_disclosure_title", bundle: .module),
+            message: String(format: ShellStrings.text("tracking_disclosure_text", bundle: .module), ShellStrings.appName()),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: Strings.text("tracking_disclosure_decline"), style: .cancel) { _ in then(false) })
-        alert.addAction(UIAlertAction(title: Strings.text("tracking_disclosure_accept"), style: .default) { [service] _ in
+        alert.addAction(UIAlertAction(title: ShellStrings.text("tracking_disclosure_decline", bundle: .module), style: .cancel) { _ in then(false) })
+        alert.addAction(UIAlertAction(title: ShellStrings.text("tracking_disclosure_accept", bundle: .module), style: .default) { [service] _ in
             service.disclosure.accept()
             then(true)
         })

@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import VougaDevShell
 
 /// SHARES THE STARTED COURIER'S POSITION WITH THE SITE WHILE A MISSION IS UNDER WAY, with the screen off too.
 ///
@@ -7,7 +8,7 @@ import Foundation
 /// in the background, with the system's location indicator shown (`UIBackgroundModes = location`, App Review 2.5.4).
 /// It never asks for "Always". Started by a page through `window.VougaDevNative.startTracking` (after
 /// [TrackingStartFlow]), or when a page of the site opens and the server names a started mission ([follow]). It keeps
-/// the best recent fix and, every `intervalSeconds`, posts it to `/api/v1/courier/missions/<id>/position` with the
+/// the best recent fix and, every `intervalSeconds`, posts it to the mission's position address with the
 /// distance to the stop the courier heads for, AS THE WEB VIEW'S SESSION through [AppCaller], which renews a lost
 /// session itself.
 ///
@@ -49,6 +50,8 @@ public final class TrackingService: NSObject, CLLocationManagerDelegate {
     private var tickTask: Task<Void, Never>?
     private var latest: CLLocation?
     private var background: CLBackgroundActivitySession?
+
+    var paths: TrackingPaths { store.paths }
 
     public init(store: TrackingStore, disclosure: TrackingDisclosure, caller: @escaping () -> AppCaller) {
         self.store = store
@@ -95,7 +98,7 @@ public final class TrackingService: NSObject, CLLocationManagerDelegate {
     /// The server's `/courier/tracking` answer as a page of the site opens: start, keep or stop ([TrackingTarget.atLaunch]).
     public func follow(_ body: JSONObject) async {
         let active = runningMissionID ?? store.load()?.request.missionID
-        switch TrackingTarget.atLaunch(body, active: active) {
+        switch TrackingTarget.atLaunch(body, active: active, paths: paths) {
         case .stop: if active != nil { stop() }
         case .keep: resumeIfPending()
         case let .start(next): if await canTrack() { start(next) }
@@ -213,13 +216,13 @@ public final class TrackingService: NSObject, CLLocationManagerDelegate {
     /// The tracked mission is over. Ask the server ONCE which mission this courier's position belongs to now: carry on
     /// with it (no target, the same words), or stop. A failed question is a stop too - the next page asks again.
     private func handOver(_ ended: TrackingRequest) async -> Bool {
-        let answer = await caller().get(TrackingTarget.path)
+        let answer = await caller().get(paths.target)
         if request?.missionID != ended.missionID { return request != nil }
         if answer.isSessionLost {
             stopWith(Self.errorSessionLost)
             return false
         }
-        guard case let .ok(body) = answer, let next = TrackingTarget.next(body, current: ended) else {
+        guard case let .ok(body) = answer, let next = TrackingTarget.next(body, current: ended, paths: paths) else {
             stopWith(Self.errorMissionEnded)
             return false
         }

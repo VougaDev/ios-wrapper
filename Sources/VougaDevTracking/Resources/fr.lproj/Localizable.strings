@@ -1,0 +1,5 @@
+/* L'information affichée avant le premier partage de position. %@ est le nom de l'application. */
+"tracking_disclosure_title" = "Partage de la position pendant une mission";
+"tracking_disclosure_text" = "Pendant une mission en cours, %@ collecte votre position environ une fois par minute, même lorsque l'application est en arrière-plan ou n'est pas utilisée, afin de prévenir les personnes qui vous attendent de votre arrivée et de prouver le lieu de chaque remise. Le partage s'arrête à la fin de la mission, à la déconnexion, et au plus tard après six heures. L'indicateur de localisation le signale pendant toute sa durée.";
+"tracking_disclosure_accept" = "J'accepte";
+"tracking_disclosure_decline" = "Pas maintenant";

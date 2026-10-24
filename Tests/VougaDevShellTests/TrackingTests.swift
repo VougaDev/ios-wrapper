@@ -1,9 +1,11 @@
 import CoreLocation
 import XCTest
 @testable import VougaDevShell
+@testable import VougaDevTracking
 
 let missionID = "0b5f2a6e-7a8c-4c3e-9d1f-2b3c4d5e6f70"
 let positionPath = "/api/v1/courier/missions/\(missionID)/position"
+let paths = TrackingPaths(position: "/api/v1/courier/missions/{id}/position", target: "/api/v1/courier/tracking")
 
 final class TrackingRequestTests: XCTestCase {
 
@@ -11,17 +13,17 @@ final class TrackingRequestTests: XCTestCase {
         let parsed = TrackingRequest.parse(json(#"""
         {"missionId": "0B5F2A6E-7A8C-4C3E-9D1F-2B3C4D5E6F70", "url": "/api/v1/courier/missions/0b5f2a6e-7a8c-4c3e-9d1f-2b3c4d5e6f70/position",
          "intervalSeconds": 5, "target": {"lat": 0.39, "lng": 9.45}, "title": " On the way ", "text": null}
-        """#))
-        XCTAssertEqual(parsed, .accepted(TrackingRequest(missionID: missionID, intervalSeconds: 15, target: LatLng(lat: 0.39, lng: 9.45),
+        """#), paths: paths)
+        XCTAssertEqual(parsed, .accepted(TrackingRequest(missionID: missionID, path: paths.position(missionID)!, intervalSeconds: 15, target: LatLng(lat: 0.39, lng: 9.45),
                                                          title: "On the way", text: nil)))
     }
 
     func testRefusals() {
-        XCTAssertEqual(TrackingRequest.parse(nil as JSONObject?), .refused("invalid_request"))
-        XCTAssertEqual(TrackingRequest.parse(["missionId": "12"]), .refused("invalid_mission_id"))
-        XCTAssertEqual(TrackingRequest.parse(["missionId": missionID, "url": "https://evil.io/steal"]), .refused("invalid_url"))
-        XCTAssertEqual(TrackingRequest.parse(["missionId": missionID, "url": "/api/v1/courier/missions/\(missionID)/other"]), .refused("invalid_url"))
-        XCTAssertEqual(TrackingRequest.parse(json: "{"), .refused("invalid_json"))
+        XCTAssertEqual(TrackingRequest.parse(nil as JSONObject?, paths: paths), .refused("invalid_request"))
+        XCTAssertEqual(TrackingRequest.parse(["missionId": "12"], paths: paths), .refused("invalid_mission_id"))
+        XCTAssertEqual(TrackingRequest.parse(["missionId": missionID, "url": "https://evil.io/steal"], paths: paths), .refused("invalid_url"))
+        XCTAssertEqual(TrackingRequest.parse(["missionId": missionID, "url": "/api/v1/courier/missions/\(missionID)/other"], paths: paths), .refused("invalid_url"))
+        XCTAssertEqual(TrackingRequest.parse(json: "{", paths: paths), .refused("invalid_json"))
     }
 
     func testIntervalTargetAndWords() {
@@ -30,25 +32,25 @@ final class TrackingRequestTests: XCTestCase {
         XCTAssertEqual(TrackingRequest.clampInterval(1e300), 300)
         XCTAssertEqual(TrackingRequest.clampInterval(90.7), 90)
         let request = TrackingRequest.parse(["missionId": missionID, "intervalSeconds": true, "target": ["lat": 91, "lng": 0],
-                                             "title": String(repeating: "x", count: 100)]).request!
+                                             "title": String(repeating: "x", count: 100)], paths: paths).request!
         XCTAssertEqual(request.intervalSeconds, 60, "true is not a number")
         XCTAssertNil(request.target, "a target out of range is dropped, not fatal")
         XCTAssertEqual(request.title?.count, 80)
-        XCTAssertEqual(TrackingRequest.parse(json: request.json), .accepted(request), "what is kept reads back the same")
+        XCTAssertEqual(TrackingRequest.parse(json: request.json, paths: paths), .accepted(request), "what is kept reads back the same")
         XCTAssertEqual(request.path, positionPath)
     }
 
     func testTarget() {
-        let current = TrackingRequest(missionID: missionID, intervalSeconds: 60, target: nil, title: "t", text: "x")
+        let current = TrackingRequest(missionID: missionID, path: paths.position(missionID)!, intervalSeconds: 60, target: nil, title: "t", text: "x")
         let other = "1b5f2a6e-7a8c-4c3e-9d1f-2b3c4d5e6f70"
         let body = json(#"{"mission": {"id": "\#(other)", "status": "underway", "url": "/api/v1/courier/missions/\#(other)"}, "interval_seconds": 30}"#)
-        XCTAssertEqual(TrackingTarget.next(body, current: current),
-                       TrackingRequest(missionID: other, intervalSeconds: 30, target: nil, title: "t", text: "x"))
-        XCTAssertNil(TrackingTarget.next(json(#"{"mission": {"id": "\#(missionID)"}}"#), current: current), "never the mission that ended")
-        XCTAssertNil(TrackingTarget.next(json(#"{"mission": null}"#), current: current))
-        XCTAssertEqual(TrackingTarget.atLaunch(json(#"{"mission": null}"#), active: missionID), .stop)
-        XCTAssertEqual(TrackingTarget.atLaunch(body, active: other), .keep)
-        guard case .start = TrackingTarget.atLaunch(body, active: nil) else { return XCTFail() }
+        XCTAssertEqual(TrackingTarget.next(body, current: current, paths: paths),
+                       TrackingRequest(missionID: other, path: paths.position(other)!, intervalSeconds: 30, target: nil, title: "t", text: "x"))
+        XCTAssertNil(TrackingTarget.next(json(#"{"mission": {"id": "\#(missionID)"}}"#), current: current, paths: paths), "never the mission that ended")
+        XCTAssertNil(TrackingTarget.next(json(#"{"mission": null}"#), current: current, paths: paths))
+        XCTAssertEqual(TrackingTarget.atLaunch(json(#"{"mission": null}"#), active: missionID, paths: paths), .stop)
+        XCTAssertEqual(TrackingTarget.atLaunch(body, active: other, paths: paths), .keep)
+        guard case .start = TrackingTarget.atLaunch(body, active: nil, paths: paths) else { return XCTFail() }
     }
 
     func testPingOutcomes() {
@@ -78,25 +80,15 @@ final class TrackingRequestTests: XCTestCase {
         XCTAssertEqual(d, 11_760, accuracy: 300)
         XCTAssertEqual(FixPolicy.distance(LatLng(lat: 0, lng: 0), LatLng(lat: 0, lng: 180)), .pi * 6_371_008.8, accuracy: 1)
     }
-
-    func testMissionRoutes() {
-        XCTAssertEqual(MissionRoute.page(forBridgeURL: nil), "/courier/missions/")
-        XCTAssertEqual(MissionRoute.page(forBridgeURL: ""), "/courier/missions/")
-        XCTAssertEqual(MissionRoute.page(forBridgeURL: "/courier/missions/\(missionID.uppercased())/?tab=steps#x"), "/courier/missions/\(missionID)/")
-        XCTAssertNil(MissionRoute.page(forBridgeURL: "/shipments/"))
-        XCTAssertNil(MissionRoute.page(forBridgeURL: "//evil.io/courier/missions/"))
-        XCTAssertNil(MissionRoute.page(forBridgeURL: "https://evil.io/courier/missions/"))
-        XCTAssertNil(MissionRoute.page(forBridgeURL: "/courier/missions/12/"))
-    }
 }
 
 @MainActor
 final class TrackingStoreAndServiceTests: XCTestCase {
 
     func testStateKeepsWhyTrackingStopped() {
-        let store = TrackingStore(defaults: freshDefaults())
+        let store = TrackingStore(defaults: freshDefaults(), paths: paths)
         XCTAssertEqual(NativeBridge.text(store.state(running: nil)), #"{"active":false,"lastError":null,"lastSentAt":null,"missionId":null}"#)
-        let request = TrackingRequest(missionID: missionID, intervalSeconds: 60, target: nil, title: nil, text: nil)
+        let request = TrackingRequest(missionID: missionID, path: paths.position(missionID)!, intervalSeconds: 60, target: nil, title: nil, text: nil)
         store.save(request, startedAt: Date())
         store.recordSent(Date(timeIntervalSince1970: 1_700_000_000))
         XCTAssertEqual(NativeBridge.text(store.state(running: missionID)),
@@ -117,13 +109,13 @@ final class TrackingStoreAndServiceTests: XCTestCase {
                                renew: { _ in .signIn }, transport: transport)
         let disclosure = TrackingDisclosure(defaults: defaults)
         disclosure.accept()
-        let service = TrackingService(store: TrackingStore(defaults: defaults), disclosure: disclosure, caller: { caller })
+        let service = TrackingService(store: TrackingStore(defaults: defaults, paths: paths), disclosure: disclosure, caller: { caller })
         service.locationAllowed = { true }
         service.autoTicks = false
         return (service, transport)
     }
 
-    private let request = TrackingRequest(missionID: missionID, intervalSeconds: 300, target: LatLng(lat: 0.39, lng: 9.45), title: "t", text: nil)
+    private let request = TrackingRequest(missionID: missionID, path: paths.position(missionID)!, intervalSeconds: 300, target: LatLng(lat: 0.39, lng: 9.45), title: "t", text: nil)
 
     func testATickPostsTheFreshFixWithItsDistance() async throws {
         let (service, transport) = makeService { _ in (200, [:], #"{"tracked_at": "now", "interval_seconds": 60}"#) }
@@ -182,7 +174,7 @@ final class TrackingStoreAndServiceTests: XCTestCase {
 
     func testNothingStartsBeforeTheDisclosureIsAccepted() {
         let defaults = freshDefaults()
-        let service = TrackingService(store: TrackingStore(defaults: defaults), disclosure: TrackingDisclosure(defaults: defaults),
+        let service = TrackingService(store: TrackingStore(defaults: defaults, paths: paths), disclosure: TrackingDisclosure(defaults: defaults),
                                       caller: { fatalError("no call") })
         service.locationAllowed = { true }
         service.start(request)
@@ -222,7 +214,7 @@ final class FakePhone: TrackingPhone {
 @MainActor
 final class TrackingStartFlowTests: XCTestCase {
 
-    let request = TrackingRequest(missionID: missionID, intervalSeconds: 60, target: nil, title: nil, text: nil)
+    let request = TrackingRequest(missionID: missionID, path: paths.position(missionID)!, intervalSeconds: 60, target: nil, title: nil, text: nil)
 
     private func run(_ phone: FakePhone) -> String?? {
         var answer: String??
@@ -296,27 +288,33 @@ final class TrackingStartFlowTests: XCTestCase {
 
 final class LocalizationTests: XCTestCase {
 
-    private func table(_ language: String) throws -> [String: String] {
-        let path = try XCTUnwrap(Bundle.module.path(forResource: "Localizable", ofType: "strings", inDirectory: nil, forLocalization: language), language)
+    private func table(_ language: String, _ bundle: Bundle) throws -> [String: String] {
+        let path = try XCTUnwrap(bundle.path(forResource: "Localizable", ofType: "strings", inDirectory: nil, forLocalization: language), language)
         return try XCTUnwrap(NSDictionary(contentsOfFile: path) as? [String: String], language)
     }
 
     func testEveryTextInEnglishFrenchAndSpanish() throws {
-        let english = try table("en")
-        XCTAssertFalse(english.isEmpty)
-        for language in ["fr", "es"] {
-            let other = try table(language)
-            XCTAssertEqual(Set(other.keys), Set(english.keys), language)
-            XCTAssertTrue(other["tracking_disclosure_text"]!.contains("%@"), language)
-            XCTAssertNotEqual(other["shell_signin_text"], english["shell_signin_text"], language)
+        for bundle in [ShellResources.bundle, TrackingResources.bundle] {
+            let english = try table("en", bundle)
+            XCTAssertFalse(english.isEmpty)
+            for language in ["fr", "es"] {
+                let other = try table(language, bundle)
+                XCTAssertEqual(Set(other.keys), Set(english.keys), language)
+                for (key, text) in english where text.contains("%@") {
+                    XCTAssertTrue(other[key]?.contains("%@") == true, "\(language) \(key)")
+                }
+            }
         }
+        XCTAssertNotEqual(try table("fr", ShellResources.bundle)["shell_signin_text"], try table("en", ShellResources.bundle)["shell_signin_text"])
     }
 
     /// App Review 2.3.10: no other platform named inside the app.
     func testNoOtherPlatformIsNamed() throws {
-        for language in ["en", "fr", "es"] {
-            for text in try table(language).values {
-                XCTAssertNil(text.range(of: "android|google play|play store|\\.apk", options: [.regularExpression, .caseInsensitive]), text)
+        for bundle in [ShellResources.bundle, TrackingResources.bundle] {
+            for language in ["en", "fr", "es"] {
+                for text in try table(language, bundle).values {
+                    XCTAssertNil(text.range(of: "android|google play|play store|\\.apk", options: [.regularExpression, .caseInsensitive]), text)
+                }
             }
         }
     }

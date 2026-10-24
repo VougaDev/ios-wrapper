@@ -13,8 +13,29 @@
 "shell_ok" = "Aceptar";
 "shell_cancel" = "Cancelar";
 
-/* La información que se muestra antes del primer uso compartido de la ubicación. %@ es el nombre de la aplicación. */
-"tracking_disclosure_title" = "Ubicación compartida durante una misión";
-"tracking_disclosure_text" = "Mientras una misión está en curso, %@ recoge su ubicación aproximadamente una vez por minuto, incluso cuando la aplicación está en segundo plano o no se está usando, para avisar a las personas que esperan de que va en camino y para acreditar el lugar de cada entrega. El uso compartido se detiene cuando termina la misión, cuando cierra la sesión y, como máximo, a las seis horas. El indicador de ubicación lo muestra durante todo ese tiempo.";
-"tracking_disclosure_accept" = "Acepto";
-"tracking_disclosure_decline" = "Ahora no";
+/* Las notificaciones, solicitadas una vez justo después de iniciar sesión. Una aplicación dice qué envía en su Shell.strings. */
+"shell_push_text" = "Permita las notificaciones para enterarse en cuanto algo le concierna. Usted elige los temas en Ajustes.";
+"shell_push_continue" = "Continuar";
+"shell_push_later" = "Ahora no";
+
+/* El consentimiento. */
+"consent_title" = "Cookies y datos";
+"consent_text" = "Con su acuerdo, el sitio también utiliza:";
+"consent_accept" = "Acepto";
+"consent_refuse" = "Solo lo necesario";
+
+/* Ajustes. */
+"settings_title" = "Ajustes";
+"settings_app" = "Aplicación";
+"settings_version" = "Versión";
+"settings_notifications" = "Notificaciones";
+"settings_notifications_permission" = "Permitir notificaciones";
+"settings_notifications_on" = "Activadas";
+"settings_notifications_off" = "Desactivadas";
+"settings_notifications_topics" = "Elegir las notificaciones";
+"settings_privacy" = "Privacidad y datos";
+"settings_privacy_policy" = "Política de privacidad";
+"settings_consent" = "Cookies y datos";
+"settings_delete_account" = "Eliminar mi cuenta";
+"settings_sign_out" = "Cerrar sesión";
+"settings_sign_out_confirm" = "¿Cerrar sesión de %@ en este teléfono?";

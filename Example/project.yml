@@ -17,6 +17,11 @@ targets:
       - path: App
     dependencies:
       - package: VougaDevShell
+        product: VougaDevShell
+      - package: VougaDevShell
+        product: VougaDevTracking
+      - package: VougaDevShell
+        product: VougaDevOfflineMap
     info:
       path: App/Info.plist
       properties:

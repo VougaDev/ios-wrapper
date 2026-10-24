@@ -13,8 +13,29 @@
 "shell_ok" = "OK";
 "shell_cancel" = "Annuler";
 
-/* L'information affichée avant le premier partage de position. %@ est le nom de l'application. */
-"tracking_disclosure_title" = "Partage de la position pendant une mission";
-"tracking_disclosure_text" = "Pendant une mission en cours, %@ collecte votre position environ une fois par minute, même lorsque l'application est en arrière-plan ou n'est pas utilisée, afin de prévenir les personnes qui vous attendent de votre arrivée et de prouver le lieu de chaque remise. Le partage s'arrête à la fin de la mission, à la déconnexion, et au plus tard après six heures. L'indicateur de localisation le signale pendant toute sa durée.";
-"tracking_disclosure_accept" = "J'accepte";
-"tracking_disclosure_decline" = "Pas maintenant";
+/* Les notifications, demandées une fois juste après la connexion. Une application dit ce qu'elle envoie dans son Shell.strings. */
+"shell_push_text" = "Autorisez les notifications pour être prévenu dès que quelque chose vous concerne. Vous choisissez les sujets dans les Réglages.";
+"shell_push_continue" = "Continuer";
+"shell_push_later" = "Plus tard";
+
+/* Le consentement. */
+"consent_title" = "Cookies et données";
+"consent_text" = "Avec votre accord, le site utilise aussi :";
+"consent_accept" = "J'accepte";
+"consent_refuse" = "Le nécessaire seulement";
+
+/* Réglages. */
+"settings_title" = "Réglages";
+"settings_app" = "Application";
+"settings_version" = "Version";
+"settings_notifications" = "Notifications";
+"settings_notifications_permission" = "Autoriser les notifications";
+"settings_notifications_on" = "Activées";
+"settings_notifications_off" = "Désactivées";
+"settings_notifications_topics" = "Choisir les notifications";
+"settings_privacy" = "Confidentialité et données";
+"settings_privacy_policy" = "Politique de confidentialité";
+"settings_consent" = "Cookies et données";
+"settings_delete_account" = "Supprimer mon compte";
+"settings_sign_out" = "Se déconnecter";
+"settings_sign_out_confirm" = "Se déconnecter de %@ sur ce téléphone ?";

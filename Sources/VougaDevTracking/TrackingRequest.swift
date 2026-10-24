@@ -1,45 +1,22 @@
 import Foundation
+import VougaDevShell
 
-/// The missions' addresses, exactly as the site writes them:
-///
-/// - `/courier/missions/`              the missions list;
-/// - `/courier/missions/<uuid>/`       one mission;
-/// - `/api/v1/courier/missions/<uuid>/position`   where its positions go;
-/// - `/api/v1/courier/tracking`        which mission the position belongs to now.
-public enum MissionRoute {
-    public static let listPath = "/courier/missions/"
-    public static let trackingPath = "/api/v1/courier/tracking"
-    public static let refusedRoute = "route_refused"
+/// Where tracking talks to the site, given by the app (Ship: `/api/v1/courier/missions/{id}/position` and
+/// `/api/v1/courier/tracking`): [position] holds `{id}`, the mission's UUID; [target] names the mission the position
+/// belongs to now.
+public struct TrackingPaths: Equatable, Sendable {
+    public let position: String
+    public let target: String
 
-    static let uuid = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-
-    public static func isMissionID(_ id: String?) -> Bool {
-        guard let id else { return false }
-        return id.range(of: "^\(uuid)$", options: .regularExpression) != nil
+    public init(position: String, target: String) {
+        precondition(position.hasPrefix("/") && position.contains("{id}") && target.hasPrefix("/"), "Tracking paths: /…{id}… and /…")
+        self.position = position
+        self.target = target
     }
 
-    public static func positionPath(_ missionID: String) -> String? {
-        isMissionID(missionID) ? "/api/v1/courier/missions/\(missionID)/position" : nil
-    }
-
-    /// The mission id a same-origin path names (`.some(nil)` for the list), or nil for any other path.
-    public static func ofPath(_ path: String?) -> String?? {
-        guard let path else { return nil }
-        if path == listPath { return .some(nil) }
-        let prefix = listPath
-        guard path.hasPrefix(prefix), path.hasSuffix("/") else { return nil }
-        let id = String(path.dropFirst(prefix.count).dropLast())
-        return isMissionID(id) ? .some(id.lowercased()) : nil
-    }
-
-    /// `openMissions({url})`: no url is the list; else a same-origin PATH (never a URL with a host) that is a missions
-    /// page. The page path to open, or nil (`route_refused`).
-    public static func page(forBridgeURL url: String?) -> String? {
-        guard let url, !url.trimmingCharacters(in: .whitespaces).isEmpty else { return listPath }
-        guard url.hasPrefix("/"), !url.hasPrefix("//") else { return nil }
-        let path = String(url.prefix { $0 != "#" }.prefix { $0 != "?" })
-        guard let id = ofPath(path) else { return nil }
-        return id.map { listPath + $0 + "/" } ?? listPath
+    /// The mission's own position address; nil unless [missionID] is a UUID.
+    public func position(_ missionID: String) -> String? {
+        TrackingRequest.isMissionID(missionID) ? position.replacingOccurrences(of: "{id}", with: missionID) : nil
     }
 }
 
@@ -62,6 +39,8 @@ public struct LatLng: Equatable, Sendable {
 /// server measures it. `title` and `text` are kept for the contract's shape (Android's notification shows them).
 public struct TrackingRequest: Equatable, Sendable {
     public let missionID: String
+    /// The mission's position address, from [TrackingPaths].
+    public let path: String
     public let intervalSeconds: Int
     public let target: LatLng?
     public let title: String?
@@ -75,8 +54,10 @@ public struct TrackingRequest: Equatable, Sendable {
     public static let invalidMissionID = "invalid_mission_id"
     public static let invalidURL = "invalid_url"
 
-    /// `/api/v1/courier/missions/<id>/position`; [missionID] was checked to be a UUID.
-    public var path: String { MissionRoute.positionPath(missionID)! }
+    public static func isMissionID(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return id.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
+    }
 
     public enum Parsed: Equatable {
         case accepted(TrackingRequest)
@@ -90,17 +71,18 @@ public struct TrackingRequest: Equatable, Sendable {
     }
 
     /// The object a page passed to `startTracking(...)`; nil (a string, a number, nothing) is `invalid_request`.
-    public static func parse(_ object: JSONObject?) -> Parsed {
+    public static func parse(_ object: JSONObject?, paths: TrackingPaths) -> Parsed {
         guard let object else { return .refused(invalidRequest) }
-        guard let missionID = string(object["missionId"])?.lowercased(), MissionRoute.isMissionID(missionID) else {
+        guard let missionID = string(object["missionId"])?.lowercased(), let path = paths.position(missionID) else {
             return .refused(invalidMissionID)
         }
         // The page cannot make the app carry the courier's session anywhere but this mission's address.
-        if let url = string(object["url"]), url != MissionRoute.positionPath(missionID) { return .refused(invalidURL) }
+        if let url = string(object["url"]), url != path { return .refused(invalidURL) }
         // A target the page could not describe is dropped, not fatal: the server measures the distance itself.
         let target = (object["target"] as? JSONObject).flatMap { point(number($0["lat"]), number($0["lng"])) }
         return .accepted(TrackingRequest(
             missionID: missionID,
+            path: path,
             intervalSeconds: clampInterval(number(object["intervalSeconds"])),
             target: target,
             title: string(object["title"]).map { String($0.prefix(80)) },
@@ -109,10 +91,10 @@ public struct TrackingRequest: Equatable, Sendable {
     }
 
     /// A request kept by [json] (or any JSON text): `invalid_json` when unreadable.
-    public static func parse(json: String?) -> Parsed {
+    public static func parse(json: String?, paths: TrackingPaths) -> Parsed {
         guard let data = json?.data(using: .utf8), !data.isEmpty,
               let object = (try? JSONSerialization.jsonObject(with: data)) as? JSONObject else { return .refused(invalidJSON) }
-        return parse(object)
+        return parse(object, paths: paths)
     }
 
     /// The shape [parse] reads, so a kept request goes back through the same checks.
@@ -121,7 +103,8 @@ public struct TrackingRequest: Equatable, Sendable {
         if let target { object["target"] = ["lat": target.lat, "lng": target.lng] }
         if let title { object["title"] = title }
         if let text { object["text"] = text }
-        return NativeBridge.text(object)
+        let data = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data("{}".utf8)
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Nil when either coordinate is missing, not finite or out of range.
@@ -143,7 +126,7 @@ public struct TrackingRequest: Equatable, Sendable {
     }
 }
 
-/// `GET /api/v1/courier/tracking`: which mission, if any, this courier's position belongs to now.
+/// `GET <TrackingPaths.target>`: which mission, if any, this courier's position belongs to now.
 ///
 /// ```
 /// {"mission": {"id": "<uuid>", "status": "underway", "url": "/api/v1/courier/missions/<uuid>"} | null,
@@ -153,7 +136,6 @@ public struct TrackingRequest: Equatable, Sendable {
 /// Asked once per sign-in when a page of the site opens ([atLaunch]), and ONCE when a post answers that the tracked
 /// mission is over ([next]), so a courier carrying several missions hands over from one to the next. Never on a timer.
 public enum TrackingTarget {
-    public static let path = MissionRoute.trackingPath
 
     public enum AtLaunch: Equatable {
         /// Nothing to track: tracking still running (or kept on the phone) stops.
@@ -164,19 +146,19 @@ public enum TrackingTarget {
     }
 
     /// [active]: the mission tracked, or the one kept on the phone; nil when none.
-    public static func atLaunch(_ body: JSONObject?, active: String?) -> AtLaunch {
-        guard let request = request(body, title: nil, text: nil) else { return .stop }
+    public static func atLaunch(_ body: JSONObject?, active: String?, paths: TrackingPaths) -> AtLaunch {
+        guard let request = request(body, title: nil, text: nil, paths: paths) else { return .stop }
         return request.missionID == active ? .keep : .start(request)
     }
 
     /// The request to continue with, or nil to stop. The next mission has no target and keeps the current words. The
     /// mission that has just ended is never handed back: that would be a loop of refused posts.
-    public static func next(_ body: JSONObject?, current: TrackingRequest) -> TrackingRequest? {
-        guard let next = request(body, title: current.title, text: current.text), next.missionID != current.missionID else { return nil }
+    public static func next(_ body: JSONObject?, current: TrackingRequest, paths: TrackingPaths) -> TrackingRequest? {
+        guard let next = request(body, title: current.title, text: current.text, paths: paths), next.missionID != current.missionID else { return nil }
         return next
     }
 
-    static func request(_ body: JSONObject?, title: String?, text: String?) -> TrackingRequest? {
+    static func request(_ body: JSONObject?, title: String?, text: String?, paths: TrackingPaths) -> TrackingRequest? {
         guard let mission = body?["mission"] as? JSONObject else { return nil }
         // The answer's `url` is the mission's detail, not where positions go: the request derives its own.
         let candidate: JSONObject = [
@@ -185,7 +167,7 @@ public enum TrackingTarget {
             "title": title ?? NSNull(),
             "text": text ?? NSNull(),
         ]
-        guard case let .accepted(request) = TrackingRequest.parse(candidate) else { return nil }
+        guard case let .accepted(request) = TrackingRequest.parse(candidate, paths: paths) else { return nil }
         return request
     }
 }
@@ -204,7 +186,7 @@ public enum PingOutcome: Equatable {
     static let gone: Set<Int> = [404, 410]
     static let over: Set<String> = ["not_on_the_road", "not_started", "not_your_mission"]
 
-    /// The answer of `POST /api/v1/courier/missions/<id>/position`, after [AppCaller] tried to renew a lost session.
+    /// The answer of the position POST, after [AppCaller] tried to renew a lost session.
     public static func classify(_ answer: ApiOutcome) -> PingOutcome {
         switch answer {
         case .ok: return .sent

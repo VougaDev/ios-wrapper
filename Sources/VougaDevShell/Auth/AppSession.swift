@@ -18,26 +18,37 @@ open class AppSession {
     )
     private lazy var exchange = SessionExchange(origin: origin, userAgent: { [unowned self] in self.userAgent },
                                                 acceptLanguage: Self.acceptLanguage, transport: AppHttp.transport)
-    private let defaults: UserDefaults
 
-    /// The mission tracking of this app, when its configuration turns it on.
-    public private(set) lazy var tracking: TrackingService? = config.features.contains(.tracking)
-        ? TrackingService(store: TrackingStore(defaults: defaults), disclosure: TrackingDisclosure(defaults: defaults), caller: { [unowned self] in self.caller() })
-        : nil
+    /// What the app keeps on the phone besides the Keychain (UserDefaults of its own `storeName`).
+    public let defaults: UserDefaults
+    /// The native features beyond the core, in the order the app lists them ([ShellExtension]).
+    public let extensions: [ShellExtension]
+    /// Push notifications, when the configuration declares them.
+    public private(set) lazy var push: ShellPush? = config.push.map { ShellPush(settings: $0, session: self, defaults: defaults) }
+    /// The consent dialog, when the configuration declares purposes.
+    public private(set) lazy var consent: ShellConsent? = config.consent.map { ShellConsent(settings: $0, origin: origin, defaults: defaults) }
 
-    public init(config: ShellConfig) {
+    /// `features()`: the extensions present, and `push` when the configuration declares it.
+    public var features: [String] { extensions.map { $0.name } + (config.push == nil ? [] : ["push"]) }
+
+    public init(config: ShellConfig, extensions: [ShellExtension] = []) {
         self.config = config
+        self.extensions = extensions
         origin = AppOrigin(config.baseURL)
         client = AuthClient(issuer: config.authBaseURL, clientID: config.authClientID, redirectURI: config.redirectURI)
         store = TokenStore(vault: KeychainVault(service: config.storeName + ".auth"))
         cookies = WebCookies(origin: origin)
         defaults = UserDefaults(suiteName: config.storeName) ?? .standard
+        // A Debug build stops at once on what an extension needs and Info.plist lacks; the tests read the same list.
+        assert(Self.missingRequirements(extensions, info: Bundle.main.infoDictionary ?? [:]).isEmpty || Bundle.main.bundleIdentifier?.hasPrefix("com.apple.") == true,
+               "Info.plist lacks: \(Self.missingRequirements(extensions, info: Bundle.main.infoDictionary ?? [:]))")
         let transport = AppHttp.transport
         let discoveryDefaults = defaults
         let issuer = config.authBaseURL
         endpoints = AuthEndpoints(client: client, transport: transport) {
             await Self.discovery(issuer: issuer, defaults: discoveryDefaults, transport: transport)
         }
+        extensions.forEach { $0.attach(to: self) }
     }
 
     /// The web view's own shape plus ` <Token>App/<version> (iOS)`, as every native call sends it.
@@ -79,18 +90,24 @@ open class AppSession {
     /// signed in). In this order, while the site's session still exists: the app's own [beforeSessionEnds], the site's
     /// session ended; then the refresh token is revoked at the account service, and the tokens, the cookies and what the app keeps go.
     public func signOut() async {
-        tracking?.stop()
+        for item in extensions { await item.signOut() }
         if let jar = await cookies.jar(), !jar.isEmpty {
             let fixed = jar
-            await beforeSessionEnds(AppCaller(origin: origin, cookies: { fixed }, userAgent: { [userAgent] in userAgent },
-                                              acceptLanguage: Self.acceptLanguage, renew: { _ in .signIn }))
+            let caller = AppCaller(origin: origin, cookies: { fixed }, userAgent: { [userAgent] in userAgent },
+                                   acceptLanguage: Self.acceptLanguage, renew: { _ in .signIn })
+            await push?.forget(caller)
+            await beforeSessionEnds(caller)
             await endSiteSession(jar)
         }
         if let token = store.refreshToken() { await endpoints.revoke(token) }
         store.clear()
         await cookies.clear()
-        tracking?.forget()
         await afterSignOut()
+    }
+
+    /// What the extensions need and [info] lacks (`Bundle.main.infoDictionary` in the app).
+    public static func missingRequirements(_ extensions: [ShellExtension], info: [String: Any]) -> [String] {
+        extensions.flatMap { $0.requirements.missing(in: info) }
     }
 
     /// Called on sign-out while the site's session is still open; [caller] never renews it.

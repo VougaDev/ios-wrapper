@@ -30,6 +30,10 @@ public struct AppCaller {
         await call(path, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
     }
 
+    public func putJSON(_ path: String, _ body: JSONObject) async -> ApiOutcome {
+        await call(path, method: "PUT", body: try? JSONSerialization.data(withJSONObject: body))
+    }
+
     private func call(_ path: String, method: String, body: Data?) async -> ApiOutcome {
         let jar = await cookies()
         let first = await once(jar, path, method, body)
