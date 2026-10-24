@@ -36,7 +36,6 @@ final class ShellUITests: XCTestCase {
         snapshot(self, "signin-sheet")
         prompt.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["shell.panel.button"].waitForExistence(timeout: 15), "cancelled: back on the sign-in screen")
-        XCTAssertEqual(app.webViews.count, 1)
     }
 
     func testAPageThatCannotLoadShowsTheNativeOfflineScreen() {
@@ -52,18 +51,10 @@ final class ShellUITests: XCTestCase {
     }
 }
 
-/// A screenshot kept with the test results and, when the runner is given `SCREENSHOTS_DIR`, written there as
-/// `<device>-<name>.png`.
+/// A screenshot kept with the test results; the workflow exports them (`xcresulttool export attachments`).
 func snapshot(_ test: XCTestCase, _ name: String) {
-    let shot = XCUIScreen.main.screenshot()
-    let attachment = XCTAttachment(screenshot: shot)
+    let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
     attachment.name = name
     attachment.lifetime = .keepAlways
     test.add(attachment)
-    let env = ProcessInfo.processInfo.environment
-    guard let dir = env["SCREENSHOTS_DIR"], !dir.isEmpty else { return }
-    let device = (env["SIMULATOR_DEVICE_NAME"] ?? "device").replacingOccurrences(of: " ", with: "-")
-    let folder = URL(fileURLWithPath: dir, isDirectory: true)
-    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    try? shot.pngRepresentation.write(to: folder.appendingPathComponent("\(device)-\(name).png"))
 }

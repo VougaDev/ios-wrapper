@@ -8,6 +8,8 @@ permissions:
   contents: read
 jobs:
   test:
+    # Only here: an app's repository built on a copy of this one (merged as upstream) runs its own workflow instead.
+    if: github.repository == 'VougaDev/ios-wrapper'
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -40,9 +42,15 @@ jobs:
           grep -q "\*\* TEST BUILD SUCCEEDED \*\*" ../build-app.log
           xcodebuild test-without-building -project VougaDevExample.xcodeproj -scheme VougaDevExample \
             -destination "platform=iOS Simulator,id=$SIMULATOR" -derivedDataPath ../build/dd \
-            -resultBundlePath ../build/ui.xcresult TEST_RUNNER_SCREENSHOTS_DIR="$GITHUB_WORKSPACE/screenshots" \
+            -resultBundlePath ../build/ui.xcresult \
             | tee ../build-ui.log | grep -E "error:|Test Case|Executed|\*\* TEST" || true
           grep -q "\*\* TEST EXECUTE SUCCEEDED \*\*" ../build-ui.log
+      - name: Screenshots from the results
+        if: always()
+        run: |
+          [ -d build/ui.xcresult ] || exit 0
+          xcrun xcresulttool export attachments --path build/ui.xcresult --output-path build/attachments
+          python3 .github/screenshots.py build/attachments screenshots
       - name: Screenshots
         if: always()
         uses: actions/upload-artifact@v4

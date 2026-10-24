@@ -63,13 +63,15 @@ open class AppSession {
     /// the account service's discovery document, kept on the phone for a day; the account service out of reach, the phone's copy serves. Nil only before
     /// a first successful read.
     nonisolated static func discovery(issuer: String, defaults: UserDefaults, transport: HttpTransport) async -> Discovery? {
-        let kept = Discovery.parse(defaults.data(forKey: "discovery"))
-        if let kept, Date().timeIntervalSince1970 - defaults.double(forKey: "discovery_at") < 24 * 3600 { return kept }
+        // Per issuer: a document kept for one the account service never answers for another.
+        let key = "discovery." + issuer
+        let kept = Discovery.parse(defaults.data(forKey: key))
+        if let kept, Date().timeIntervalSince1970 - defaults.double(forKey: key + ".at") < 24 * 3600 { return kept }
         guard let url = Discovery.url(issuer: issuer),
               let (data, response) = try? await transport.send(URLRequest(url: url)),
               response.statusCode == 200, Discovery.parse(data) != nil else { return kept }
-        defaults.set(data, forKey: "discovery")
-        defaults.set(Date().timeIntervalSince1970, forKey: "discovery_at")
+        defaults.set(data, forKey: key)
+        defaults.set(Date().timeIntervalSince1970, forKey: key + ".at")
         return Discovery.parse(data)
     }
 
