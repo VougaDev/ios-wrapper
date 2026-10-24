@@ -80,6 +80,9 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
   - no web words (the table above), no "open in a new tab", no browser-only gestures;
   - every company page, error pages included, carries `<meta name="vougadev-page" content="<service>">` in its head:
     the shells treat a main-frame answer from a trusted origin without it as an edge or CDN error (offline handling);
+  - a page whose title is not a screen name (a home whose title is a slogan for search engines) says its name in
+    `<meta name="vougadev-screen" content="Accueil">`. The shells list saved screens by it, or else by the title
+    without " · <App>"; never by a slogan;
   - they read the app's user agent (` <App>App/<version> (Android|iOS)`) to adapt layout and wording, server-side and
     inside iframes alike. They use `VougaDevNative` (where injected) only for actions.
 - **An outside step that must leave the WebView** (PayPal, a bank's 3-D Secure, an operator's page that refuses
