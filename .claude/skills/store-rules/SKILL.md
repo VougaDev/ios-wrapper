@@ -37,6 +37,36 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
   - only a page never visited says it is not available offline, and it offers what is (the cached pages, the native
     screens), never a lone "retry" button.
   - A first launch with no network shows the app's own welcome, not an error.
+- **An app's words, never a website's** (Apple's Human Interface Guidelines; 4.2 "feels like a website"). Every text the
+  person sees inside the app, native or a page of the site, avoids web vocabulary:
+
+  | Never | Say instead |
+  |---|---|
+  | page / page / página ("Page introuvable", "page précédente", "cette page") | what it is: "Introuvable", "Retour", "le suivi de l'envoi", "ce qui suit", or the screen's own name |
+  | site, web, browser / navigateur / navegador | the app's name, or nothing |
+  | click / cliquer / hacer clic | tap / touchez / toque, or just the action ("Envoyer") |
+  | link / lien / enlace, URL, address bar | the thing it opens |
+  | reload / recharger / recargar, refresh the page | "Réessayer", or pull to refresh |
+  | tab / onglet (a browser's), download the page, bookmark | nothing |
+  | "Page unavailable", "This page could not be loaded" | "Hors connexion", "Pas encore enregistré sur ce téléphone" |
+
+  Texts that leave the app (an SMS or e-mail carrying a URL) may say "lien" or "page": they are read in another app.
+  Native strings come from the app's catalogue in en, fr and es; check all three.
+- **One app, one WebView, every company domain** (Echo, 2026-10-24). A WebView is not limited to one domain: the app's
+  site, the company's other domains and subdomains, and the account service's pages all load in the SAME WebView, with
+  one navigation and the native back. No "close" button, no seam, never the browser.
+  - The bridge (`VougaDevNative`) is injected on a configured list of trusted company origins, never on others.
+  - **Sign-in happens inside the app.** The account service's sign-in page loads in the WebView. Once signed in, it
+    calls the shell through the bridge with the authorisation code, and the shell trades it for the app's tokens. No
+    redirect to a custom scheme, no browser.
+  - **Other companies' logins go native**, because they refuse WebViews. The page asks the shell, which uses the
+    platform's own sign-in: Google through Android's Credential Manager and Google's iOS sign-in, Apple through the
+    native Sign in with Apple sheet. The token goes back to the account service.
+  - **Passkeys work in the WebView** once the app is declared for the account domain: Digital Asset Links with
+    WebView WebAuthn support on Android, Associated Domains (`webcredentials:`) on iOS.
+  - **Only third parties leave the WebView:** a payment checkout or a map opens in an in-app browser sheet (Custom Tab
+    / `SFSafariViewController`), never mixed into the app's WebView. `tel:`, `mailto:`, maps and chat links open the
+    phone's own app.
 - **Never a raw error page.** A bare "Not Found", "Bad Gateway", a proxy's or CDN's error page, or a framework's
   debug or CSRF page inside the app is a website showing through (4.2, and 2.1 completeness):
   - the site serves its own page for every HTTP error (400, 403, 404, an expired form, 500), in its own layout and
@@ -84,11 +114,9 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 
 ### Sign-in outside the WebView: required, and done the right way
 
-- The sign-in page never runs inside the WebView:
-  - Google refuses OAuth in an embedded WebView (`disallowed_useragent`);
-  - passkeys do not work there;
-  - RFC 8252 (OAuth for native apps) forbids it.
-- It opens in the system's sign-in surface, over the app:
+- Superseded for the company's own account service: see "One app, one WebView, every company domain" (sign-in inside
+  the WebView, finished through the bridge, with native sheets for Google and Apple). The system sign-in surface below
+  remains the fallback for an account service that cannot call the shell yet:
   - Android: AppAuth with a Chrome Custom Tab (a tab on top of the app, with a close button), never the full browser
     app;
   - iOS: `ASWebAuthenticationSession`, the system sheet "<App> wants to use <sign-in domain> to sign in".
@@ -172,7 +200,10 @@ Report each line as done, failed and fixed, or skipped (with why). Never say "co
    - Fail with the iOS user agent if a page sells a digital feature, unless through in-app purchase.
    - Fail with either user agent if "Privacy and data" (policy, account deletion, notification settings) is more than
      about 3 taps away, if a page shows an install prompt, or if the site's cookie banner appears in the app.
-2. **Native texts.** Grep the native resources for `Android|Google Play|apk|Play Store` in the iOS project, and for
+2. **Native texts and in-app words.** Grep every catalogue (en, fr, es), native and the site's, for web vocabulary:
+   `page|página|site|web|navigateur|navegador|browser|cliqu|click|clic|lien|link|enlace|URL|recharg|reload|recarg|onglet|tab`.
+   Every hit shown inside the app is reworded; SMS and e-mail texts with a URL may stay. Grep the native resources for
+   `Android|Google Play|apk|Play Store` in the iOS project, and for
    `apk|install` in the Android one. Also grep for placeholder text, "TODO", and other products' names (e.g. "PIVO").
 3. **Manifest and plist.**
    - Android: no `REQUEST_INSTALL_PACKAGES`, no `ACCESS_BACKGROUND_LOCATION` unless it is declared and justified, a
