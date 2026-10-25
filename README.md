@@ -57,7 +57,7 @@ Every app has it; it is the `VougaDevShell` library.
 | Errors | Never a raw error page: a 502, 503, 504 or a CDN's 520–530 on a company page, or a page of the site's or the payment service's origin without the company's `<meta name="vougadev-page">` (`requirePageMeta`; an older `siteMarker` text is accepted), is answered as with no network (the saved copy, or what is saved). The site serves its own page for its own errors. |
 | Offline | A native screen (title, sentence, Try again) instead of a browser error, at launch too. |
 | Before sign-in | The sign-in screen links the site's privacy page (`privacyPath`, `/privacy/` by default). |
-| Notifications | Asked once, right after a sign-in, after one native sentence (`shell_push_text`, which the app rewords), never at launch, never a condition. The APNs token goes to the site (`PUT <registerPath>` `{kind: "apns", token, label, platform: "ios", locale, app}`), which hands it to the hub; on sign-out `POST <forgetPath>` `{token}`. A tapped notification `{app, url, screen?, topic, id}`: this app's opens the native screen an extension claims for `screen`, else its page; another app's opens through the system (that app, or Safari); never a blank screen (this app's home). |
+| Notifications | Asked once, right after a sign-in, after one native sentence (`shell_push_text`, which the app rewords), never at launch, never a condition. Firebase Cloud Messaging, as on Android (VougaDev Notify sends both): Firebase starts with the app's `GoogleService-Info.plist` (git-ignored, from VougaDev's Firebase project with the app's APNs key), APNs' token goes to Firebase, and the FCM token goes to the site (`PUT <registerPath>` `{kind: "fcm", token, label, platform: "ios", locale, app}`), which hands it to the hub; on sign-out `POST <forgetPath>` `{token}`. A tapped notification `{app, url, screen?, topic, id}`: this app's opens the native screen an extension claims for `screen`, else its page; another app's opens through the system (that app, or Safari); never a blank screen (this app's home). |
 | Settings | Native, opened by the page (`openSettings()`, an item of its account menu shown only in the app), never in the site's main menu: version; notifications (system permission, the hub's topics page); "On this phone" (each extension's rows); "Privacy and data" (privacy policy, cookies and data, delete my account at the account service); sign out. |
 | Consent | When the app declares purposes: a native dialog, asked once before the first page, each purpose off until turned on; the choice is the first-party cookie `vougadev_consent=<purpose>:1\|<purpose>:0` and `consent()`. Changed in Settings. |
 | Pages | JavaScript `alert`/`confirm` as native alerts; camera and microphone streams refused; a crashed page process reloaded; swipe back; pull to refresh. |
@@ -123,8 +123,11 @@ The app's own repository holds an `ios/` folder: copy [Example](Example) and cha
 
    The app delegate makes the session at launch and hands APNs' token to `session.push?.didRegister(deviceToken:)`.
    `storeName` defaults to the bundle id and must never change once shipped (people would be signed out).
-5. **The account service**: register `<bundle id>:/oauth2redirect` on the app's client.
-6. **The site**: honour the user agent (no other platform, no download or install prompt, no digital sale outside
+5. **Push (required in every app)**: add the app's bundle id to VougaDev's Firebase project with the team's APNs key,
+   put its `GoogleService-Info.plist` in the app's target (git-ignored), turn on the Push Notifications capability
+   (`aps-environment`) and the remote-notification background mode. The shell does the rest (FCM token to the site).
+6. **The account service**: register `<bundle id>:/oauth2redirect` on the app's client.
+7. **The site**: honour the user agent (no other platform, no download or install prompt, no digital sale outside
    in-app purchase, no cookie banner inside the app), and an account-menu item, shown only inside the app, that calls
    `VougaDevNative.openSettings()`.
 

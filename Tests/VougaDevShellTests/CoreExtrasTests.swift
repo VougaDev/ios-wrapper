@@ -35,7 +35,7 @@ final class NotificationRouteTests: XCTestCase {
     @MainActor
     func testTheTokenReportNamesTheAppAndPlatform() {
         let report = ShellPush.report(token: "abc", settings: ShellPush.Settings(appSlug: "ship"), label: "iPhone", locale: "fr_FR")
-        XCTAssertEqual(NativeBridge.text(report), #"{"app":"ship","kind":"apns","label":"iPhone","locale":"fr_FR","platform":"ios","token":"abc"}"#)
+        XCTAssertEqual(NativeBridge.text(report), #"{"app":"ship","kind":"fcm","label":"iPhone","locale":"fr_FR","platform":"ios","token":"abc"}"#)
     }
 
     @MainActor

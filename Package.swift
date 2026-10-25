@@ -12,8 +12,14 @@ let package = Package(
         .library(name: "VougaDevTracking", targets: ["VougaDevTracking"]),
         .library(name: "VougaDevOfflineMap", targets: ["VougaDevOfflineMap"]),
     ],
+    dependencies: [
+        // Push in every app: FCM on iOS as on Android (VougaDev Notify sends to both); inert without the app's
+        // GoogleService-Info.plist.
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", from: "12.0.0"),
+    ],
     targets: [
-        .target(name: "VougaDevShell", resources: [.process("Resources")]),
+        .target(name: "VougaDevShell", dependencies: [.product(name: "FirebaseMessaging", package: "firebase-ios-sdk")],
+                resources: [.process("Resources")]),
         .target(name: "VougaDevTracking", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
         .target(name: "VougaDevOfflineMap", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
         .testTarget(name: "VougaDevShellTests", dependencies: ["VougaDevShell", "VougaDevTracking", "VougaDevOfflineMap"]),

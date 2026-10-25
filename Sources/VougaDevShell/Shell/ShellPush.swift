@@ -1,3 +1,5 @@
+import FirebaseCore
+import FirebaseMessaging
 import UIKit
 import UserNotifications
 
@@ -34,19 +36,23 @@ public enum NotificationRoute: Equatable {
     }
 }
 
-/// PUSH NOTIFICATIONS, PART OF THE CORE (every app receives them; the hub sends them through APNs):
+/// PUSH NOTIFICATIONS, PART OF THE CORE (every app receives them; VougaDev Notify sends them through Firebase Cloud
+/// Messaging, to iOS as to Android):
 ///
+/// - Firebase starts with the app's own `GoogleService-Info.plist` (in the app's bundle, never in this repository);
+///   without it the app receives no push;
 /// - the permission is asked right after a sign-in, once, after one native sentence (the controller's screen); a
 ///   refusal blocks nothing (App Review 4.5.4, 5.1.2);
-/// - the installation's APNs token is reported to the app's site, which hands it to the hub, after each sign-in and
-///   whenever APNs renews it: `PUT <registerPath>` `{kind: "apns", token, label, platform: "ios", locale, app}`; on
-///   sign-out `POST <forgetPath>` `{token}`, while the site's session is still open;
+/// - APNs' token goes to Firebase, which answers this installation's FCM token; that one is reported to the app's site,
+///   which hands it to the hub, after each sign-in and whenever it is renewed: `PUT <registerPath>`
+///   `{kind: "fcm", token, label, platform: "ios", locale, app}`; on sign-out `POST <forgetPath>` `{token}`, while the
+///   site's session is still open;
 /// - a tapped notification becomes a [NotificationRoute] for the controller, kept until it is ready.
 ///
-/// The app's delegate hands the token over: `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` calls
+/// The app's delegate hands APNs' token over: `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` calls
 /// [didRegister(deviceToken:)].
 @MainActor
-public final class ShellPush: NSObject, UNUserNotificationCenterDelegate {
+public final class ShellPush: NSObject, UNUserNotificationCenterDelegate, MessagingDelegate {
 
     public struct Settings {
         /// The hub's name for this app, as its notifications carry it in `app`.
@@ -83,6 +89,15 @@ public final class ShellPush: NSObject, UNUserNotificationCenterDelegate {
         self.defaults = defaults
         super.init()
         UNUserNotificationCenter.current().delegate = self
+        if Self.startFirebase() { Messaging.messaging().delegate = self }
+    }
+
+    /// Firebase, configured once from the app's `GoogleService-Info.plist`; false without it (no push).
+    static func startFirebase() -> Bool {
+        if FirebaseApp.app() != nil { return true }
+        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else { return false }
+        FirebaseApp.configure()
+        return true
     }
 
     /// Asked once per installation: the person answered the sentence (yes or later).
@@ -113,9 +128,25 @@ public final class ShellPush: NSObject, UNUserNotificationCenterDelegate {
         get async { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus }
     }
 
-    /// From the app's delegate. Reported while signed in; kept for the sign-out's forget.
+    /// From the app's delegate: APNs' token goes to Firebase, which answers the FCM token (also on each sign-in, so the
+    /// site hears it again).
     public func didRegister(deviceToken: Data) {
-        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        guard Self.startFirebase() else { return }
+        Messaging.messaging().apnsToken = deviceToken
+        Messaging.messaging().token { token, _ in
+            guard let token else { return }
+            Task { @MainActor in self.received(token: token) }
+        }
+    }
+
+    /// Firebase renewed the FCM token.
+    public nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let fcmToken else { return }
+        Task { @MainActor in self.received(token: fcmToken) }
+    }
+
+    /// Reported while signed in; kept for the sign-out's forget.
+    func received(token: String) {
         defaults.set(token, forKey: "push.token")
         guard session.signedIn else { return }
         Task { _ = await session.caller().putJSON(settings.registerPath, Self.report(token: token, settings: settings)) }
@@ -123,7 +154,7 @@ public final class ShellPush: NSObject, UNUserNotificationCenterDelegate {
 
     static func report(token: String, settings: Settings, label: String = UIDevice.current.model,
                        locale: String = Locale.current.identifier) -> JSONObject {
-        ["kind": "apns", "token": token, "label": String(label.prefix(80)), "platform": "ios", "locale": locale, "app": settings.appSlug]
+        ["kind": "fcm", "token": token, "label": String(label.prefix(80)), "platform": "ios", "locale": locale, "app": settings.appSlug]
     }
 
     /// Signing out, with the caller of the still-open session: this installation stops receiving this person's pushes.
