@@ -104,6 +104,7 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
   - the shell catches a main-frame error that does not come from the site (502, 503 or 504 from the edge, a CDN's
     error page, a timeout). It treats it as offline: the last cached copy of the page with a native bar, or the
     native "not available" screen, never the raw page.
+- **Push is never optional** (see "Push notifications: required in every app" below).
 - **The shell's core alone is never enough.** Core = the WebView, the system sign-in, the link rules, the offline
   screen. Every app enables at least one real native extension that matters to its users: `tracking`, `offline-map`
   (the site's own maps keep working offline), a scanner, push, or its own native screens. An app whose
@@ -187,6 +188,21 @@ The main reason web wrappers are rejected. The app must do what Safari cannot:
 - **Android:** a foreground service of type `location`, started while the app is visible, with its notification
   shown. Never `ACCESS_BACKGROUND_LOCATION` unless truly needed: it brings a separate Play review and video.
 - **Play Console:** the foreground-service declaration needs a short video of start, notification and stop.
+
+### Push notifications: required in every app (Echo, 2026-10-25)
+
+Push notifications are not optional: they are the main reason VougaDev builds native apps. No app is shown to Echo,
+built for a store or submitted without them working end to end:
+
+- **The app** is built with its Firebase file (Android: `app/google-services.json`, iOS: APNs through the same project
+  once Apple's account exists) and its `pushDevicesPath`; a build without them is a test build only.
+- **The site** takes the phone's token (`PUT <pushDevicesPath>`, `POST <pushDevicesPath>/forget`) and hands it to the
+  account service's hub, which keeps where each person's pushes go and their choices per topic.
+- **The site sends them**, with its own service account (FCM HTTP v1, data-only `{app, url, topic, id, title, body}`):
+  push is the first channel for a person who has the app (free, instant), before Telegram, e-mail and SMS; a token the
+  push service refuses is forgotten at the hub and the notification goes on the next channel.
+- **Proved on a phone:** sign in, accept notifications, trigger a real notification of the product (an order, a
+  mission), see it arrive with the app closed, tap it, land on the right screen inside the app.
 
 ### Notifications, install prompts, consent
 
