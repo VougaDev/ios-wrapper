@@ -4,9 +4,9 @@ import UIKit
 /// item of its account menu, shown only inside the app).
 ///
 /// - the app's version;
-/// - Notifications: the system permission, and the hub's page that chooses topics and channels;
+/// - Notifications: the system permission, and the account service's page that chooses topics and channels;
 /// - Privacy and data: the privacy policy (the site's page), cookies and data (the consent dialog again), deleting the
-///   account (the account service's page, in Safari);
+///   account (the account service's page). Pages open in the app's web view, never outside;
 /// - Sign out of this app on this phone.
 @MainActor
 final class SettingsViewController: UITableViewController {
@@ -122,13 +122,14 @@ final class SettingsViewController: UITableViewController {
         case let .entry(entry):
             entry.action?(self)
         case .topics:
-            if let url = config.push?.preferencesURL.flatMap(URL.init(string:)) { UIApplication.shared.open(url) }
+            // The account service's own page, in the app's web view (signed in there since the sign-in happens inside).
+            if let url = config.push?.preferencesURL { dismiss(animated: true) { self.openPage(url) } }
         case .privacy:
             if let url = session.origin.pageURL(config.privacyPath) { dismiss(animated: true) { self.openPage(url) } }
         case .consent:
             session.consent?.ask(from: self, again: true) {}
         case .deleteAccount:
-            if let url = config.accountDeletionURL.flatMap(URL.init(string:)) { UIApplication.shared.open(url) }
+            if let url = config.accountDeletionURL { dismiss(animated: true) { self.openPage(url) } }
         case .signOut:
             let confirm = UIAlertController(title: nil, message: String(format: Strings.text("settings_sign_out_confirm"), Strings.appName()),
                                             preferredStyle: .alert)
