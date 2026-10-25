@@ -178,6 +178,9 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         web.navigationDelegate = self
         web.uiDelegate = self
         web.allowsBackForwardNavigationGestures = true
+        // An app shows no scrollbar.
+        web.scrollView.showsVerticalScrollIndicator = false
+        web.scrollView.showsHorizontalScrollIndicator = false
         web.isInspectable = session.config.inspectable
         web.isOpaque = false
         web.backgroundColor = session.config.colors.background
@@ -243,9 +246,11 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         guard let url = action.request.url else { return decisionHandler(.cancel) }
         // Frames inside a page navigate within themselves; only the top level (or a new window) is policed.
         if let frame = action.targetFrame, !frame.isMainFrame { return decisionHandler(.allow) }
-        // The account service's answer to a sign-in in the web view: its redirect to the app's own address.
-        if pendingSignIn != nil, url.absoluteString.hasPrefix(session.config.redirectURI) {
+        // The account service's answer to a sign-in in the web view: its redirect to the app's own address. One whose
+        // sign-in this app no longer holds (started before the app was closed) goes back to the sign-in.
+        if url.absoluteString.hasPrefix(session.config.redirectURI) {
             decisionHandler(.cancel)
+            guard pendingSignIn != nil else { return show(.signIn) }
             let request = pendingSignIn
             if case let .code(code) = request?.read(callback: url, client: session.client) {
                 Task { _ = await completeWebSignIn(code: code, state: request?.state) }
