@@ -59,10 +59,7 @@ jobs:
           path: screenshots
           if-no-files-found: warn
       - name: Nothing in this public repository reveals what the sites run on
-        run: |
-          # The sites' framework and servers, the internal names of the company's services, paths on a developer's machine.
-          if git grep -nIiE 'framework|server|server|queue|database|accounts|client|/home/[a-z]|/Users/[a-z]|Projects/' -- . ':!.github/workflows/'; then exit 1; fi
-          if git grep -nIwE 'the account service|WALLET|GeoGrid' -- . ':!.github/workflows/'; then exit 1; fi
+        run: python3 .github/scrub.py
       - name: An app's words, never a website's (App Review 4.2)
         run: python3 .github/check-words.py Sources Example/App
       - name: No other platform named in the app's texts (App Review 2.3.10)
