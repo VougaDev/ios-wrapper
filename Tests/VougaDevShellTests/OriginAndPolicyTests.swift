@@ -46,6 +46,10 @@ final class OriginAndPolicyTests: XCTestCase {
         XCTAssertEqual(decide("https", site: true, native: true, path: "/courier/missions/"), .openNative)
         XCTAssertEqual(decide("https", path: "/"), .openSheet, "an outside company's site: an in-app sheet")
         XCTAssertEqual(decide("mailto"), .openOutside)
+        XCTAssertEqual(LinkPolicy.decide(scheme: "https", isSite: false, isAuth: false, isNativeRoute: false,
+                                         isAppLink: LinkPolicy.isCompany(host: "t.me", domains: LinkPolicy.appHosts)), .openOutside,
+                       "Telegram's links open Telegram")
+        XCTAssertTrue(LinkPolicy.isCompany(host: "telegram.me", domains: LinkPolicy.appHosts))
         XCTAssertTrue(LinkPolicy.isCompany(host: "pay.example.org", domains: ["example.org"]))
         XCTAssertTrue(LinkPolicy.isCompany(host: "EXAMPLE.org", domains: ["example.org"]))
         XCTAssertFalse(LinkPolicy.isCompany(host: "evilexample.org", domains: ["example.org"]))

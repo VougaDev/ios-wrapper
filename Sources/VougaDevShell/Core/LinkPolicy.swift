@@ -30,8 +30,11 @@ public enum LinkPolicy {
     /// [authSignInPaths] are the account service's sign-in pages: they run in the web view when [signInInWebView], else
     /// the system sheet.
     public static func decide(scheme: String?, isSite: Bool, isAuth: Bool, isCompany: Bool = false, isNativeRoute: Bool,
-                              path: String? = nil, authSignInPaths: [String] = [], signInInWebView: Bool = false) -> Decision {
+                              path: String? = nil, authSignInPaths: [String] = [], signInInWebView: Bool = false,
+                              isAppLink: Bool = false) -> Decision {
         guard let s = scheme?.lowercased() else { return .block }
+        // A link an app on the phone answers (Telegram's t.me): that app, tapped or redirected to, never the web view.
+        if isAppLink && (s == "https" || s == "http") { return .openOutside }
         if isSite && SignInRoute.isSiteSignIn(path) { return .signIn }
         if isAuth && SignInRoute.isAuthSignIn(path, paths: authSignInPaths) { return signInInWebView ? .loadInside : .signIn }
         if isSite && isNativeRoute { return .openNative }
@@ -41,6 +44,9 @@ public enum LinkPolicy {
         if s == "https" || s == "http" { return .openSheet }
         return .openOutside
     }
+
+    /// Hosts whose links belong to an app on the phone: Telegram's bot and chat links.
+    public static let appHosts = ["t.me", "telegram.me"]
 
     /// True for [host] on one of the company's [domains] or their subdomains (`pay.example.org` for `example.org`).
     public static func isCompany(host: String?, domains: [String]) -> Bool {

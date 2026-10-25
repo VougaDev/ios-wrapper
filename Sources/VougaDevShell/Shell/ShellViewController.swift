@@ -277,7 +277,8 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         let isCompany = LinkPolicy.isCompany(host: url.host, domains: session.config.companyDomains)
         switch LinkPolicy.decide(scheme: url.scheme, isSite: isSite, isAuth: auth.matches(url), isCompany: isCompany,
                                   isNativeRoute: screen != nil, path: path, authSignInPaths: session.config.authSignInPaths,
-                                  signInInWebView: session.config.signInInWebView) {
+                                  signInInWebView: session.config.signInInWebView,
+                                  isAppLink: LinkPolicy.isCompany(host: url.host, domains: LinkPolicy.appHosts)) {
         case .loadInside:
             // The UI tests' "no network": a page of the network is never loaded, as in airplane mode.
             if session.config.simulateOffline && !loadingKept {
