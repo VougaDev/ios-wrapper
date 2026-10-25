@@ -67,7 +67,8 @@ public struct AuthorizeRequest {
     }
 
     /// The account service's pages in the phone's language ([uiLocales]), as the web's own sign-in asks.
-    public func url(discovery: Discovery, client: AuthClient, scopes: String, uiLocales: String) -> URL? {
+    /// [extra]: the site's own asks passed on (`prompt=create` for a sign-up, `prompt=login|select_account`, `max_age`).
+    public func url(discovery: Discovery, client: AuthClient, scopes: String, uiLocales: String, extra: [String: String] = [:]) -> URL? {
         guard var parts = URLComponents(string: discovery.authorizationEndpoint) else { return nil }
         parts.queryItems = (parts.queryItems ?? []) + [
             URLQueryItem(name: "response_type", value: "code"),
@@ -79,7 +80,7 @@ public struct AuthorizeRequest {
             URLQueryItem(name: "code_challenge", value: PKCE.challenge(for: verifier)),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "ui_locales", value: uiLocales),
-        ]
+        ] + extra.keys.sorted().map { URLQueryItem(name: $0, value: extra[$0]) }
         // `+` is a space to a form decoder: a scope list must not turn into one.
         parts.percentEncodedQuery = parts.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return parts.url

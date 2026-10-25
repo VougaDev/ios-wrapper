@@ -66,7 +66,7 @@ public struct ShellConfig {
     public var outsideReturnPrefix: String?
     /// Providers that refuse web views (`paypal.com`): a navigation there from a company page becomes an outside step.
     public var outsideHosts: [String] = []
-    /// The sign-in runs in the web view (the account service's page, finished with `completeSignIn` or its redirect);
+    /// The sign-in runs in the web view (the account service's pages, ended by its redirect to the app's address, caught);
     /// false: in the system sign-in sheet, until the account service calls the shell.
     public var signInInWebView = false
     /// The app's Google client for iOS (`nativeSignIn("google")`); nil: Google sign-in is unavailable natively.

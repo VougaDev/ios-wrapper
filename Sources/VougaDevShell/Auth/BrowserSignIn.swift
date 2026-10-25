@@ -3,8 +3,8 @@ import UIKit
 
 /// THE APP'S SIGN-IN with the account service: the authorization code flow with PKCE S256 for the app's public client,
 /// then the code exchange; the tokens go to the [SessionKeeper]. The code arrives from the web view (the account
-/// service's page calls `completeSignIn`, or redirects to the app's address) or, as the fallback while the account
-/// service cannot finish it through the bridge, from the system sign-in sheet (`ASWebAuthenticationSession`).
+/// service's final redirect to the app's address, caught there) or, as the fallback, from the system sign-in sheet
+/// (`ASWebAuthenticationSession`).
 ///
 /// The ID token is not read: the app uses only the access token, as a bearer the site checks with the account service itself.
 @MainActor
@@ -27,11 +27,12 @@ final class BrowserSignIn: NSObject, ASWebAuthenticationPresentationContextProvi
 
     /// The account service's authorization address for a new sign-in, with its PKCE request; nil when the account
     /// service cannot be reached.
-    func prepare() async -> (url: URL, request: AuthorizeRequest)? {
+    func prepare(extra: [String: String] = [:]) async -> (url: URL, request: AuthorizeRequest)? {
         guard let discovery = await session.discovery() else { return nil }
         let request = AuthorizeRequest()
         let locale = Locale.current.language.languageCode?.identifier ?? "en"
-        guard let url = request.url(discovery: discovery, client: session.client, scopes: session.config.scopes, uiLocales: locale) else {
+        guard let url = request.url(discovery: discovery, client: session.client, scopes: session.config.scopes, uiLocales: locale,
+                                    extra: extra) else {
             return nil
         }
         return (url, request)
@@ -47,9 +48,9 @@ final class BrowserSignIn: NSObject, ASWebAuthenticationPresentationContextProvi
     }
 
     /// The fallback while the account service cannot finish the sign-in through the bridge: the system sign-in sheet.
-    func start(from window: UIWindow?) async -> Outcome {
+    func start(from window: UIWindow?, extra: [String: String] = [:]) async -> Outcome {
         guard running == nil else { return .cancelled }
-        guard let (url, request) = await prepare() else { return .offline }
+        guard let (url, request) = await prepare(extra: extra) else { return .offline }
         anchor = window
         let callback: URL? = await withCheckedContinuation { done in
             var finished = false

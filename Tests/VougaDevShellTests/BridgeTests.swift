@@ -7,14 +7,14 @@ final class BridgeTests: XCTestCase {
 
     let roles = [
         NativeShim.Role(origin: origin, members: ["startTracking", "openSettings", "echo", "twice", "later", "never"]),
-        NativeShim.Role(origin: AppOrigin("https://auth.example.org"), members: ["completeSignIn"]),
+        NativeShim.Role(origin: AppOrigin("https://auth.example.org"), members: ["nativeSignIn"]),
         NativeShim.Role(origin: AppOrigin("https://pay.example.org"), members: ["openOutside"], frames: true),
     ]
 
     func testScriptChecksTheOriginAndListsTheMembers() {
         let script = NativeShim.script(roles: roles, version: "1.0\"; alert(1); \"", features: ["tracking", "offline-map"])
         XCTAssertTrue(script.contains(#""https:\/\/app.example.org": { members: ["startTracking", "openSettings", "echo", "twice", "later", "never"], frames: false }"#))
-        XCTAssertTrue(script.contains(#""https:\/\/auth.example.org": { members: ["completeSignIn"], frames: false }"#))
+        XCTAssertTrue(script.contains(#""https:\/\/auth.example.org": { members: ["nativeSignIn"], frames: false }"#))
         XCTAssertTrue(script.contains(#""https:\/\/pay.example.org": { members: ["openOutside"], frames: true }"#))
         XCTAssertTrue(script.contains("if (!role) { return; }"))
         XCTAssertTrue(script.contains("if (window !== window.top && !role.frames) { return; }"))
@@ -38,10 +38,10 @@ final class BridgeTests: XCTestCase {
 
     func testBridgeRoutesAndRefuses() {
         let echo: NativeBridge.Method = { args, answer in answer(["ok": true, "got": args ?? [:]]) }
-        let bridge = NativeBridge(roles: roles, methods: ["echo": echo, "completeSignIn": echo, "openOutside": echo])
+        let bridge = NativeBridge(roles: roles, methods: ["echo": echo, "nativeSignIn": echo, "openOutside": echo])
         XCTAssertEqual(call(bridge, #"{"method":"echo","args":{"a":1}}"#)?["got"] as? [String: Int], ["a": 1])
         XCTAssertEqual(call(bridge, #"{"method":"echo"}"#, host: "evil.io")?["error"] as? String, "origin_refused")
-        XCTAssertEqual(call(bridge, #"{"method":"completeSignIn","args":{"a":1}}"#, host: "auth.example.org")?["got"] as? [String: Int], ["a": 1],
+        XCTAssertEqual(call(bridge, #"{"method":"nativeSignIn","args":{"a":1}}"#, host: "auth.example.org")?["got"] as? [String: Int], ["a": 1],
                        "the account service's own member")
         XCTAssertEqual(call(bridge, #"{"method":"echo"}"#, host: "auth.example.org")?["error"] as? String, "origin_refused",
                        "not a member of the account service's")
@@ -102,7 +102,7 @@ final class BridgeTests: XCTestCase {
         ] {
             XCTAssertTrue(controller.responds(to: NSSelectorFromString(selector)), selector)
         }
-        XCTAssertEqual(controller.bridgeMethods().map { $0.0 }, ["openSettings", "completeSignIn", "nativeSignIn", "openOutside", "network", "consent", "startTracking", "stopTracking", "trackingState"])
+        XCTAssertEqual(controller.bridgeMethods().map { $0.0 }, ["openSettings", "openOutside", "network", "consent", "startTracking", "stopTracking", "trackingState"])
         XCTAssertEqual(AppSession.missingRequirements([tracking], info: [:]),
                        ["NSLocationWhenInUseUsageDescription", "UIBackgroundModes: location", "NSLocationTemporaryUsageDescriptionDictionary: Tracking"])
         XCTAssertEqual(AppSession.missingRequirements([tracking], info: [

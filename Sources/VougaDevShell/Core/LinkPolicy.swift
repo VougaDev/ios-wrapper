@@ -70,6 +70,18 @@ public enum SignInRoute {
         isSite && method?.uppercased() == "POST" && (path == siteSignOut || path == String(siteSignOut.dropLast()))
     }
 
+    /// What a site's `/auth/login/?…` asks of the account service: a sign-up (`prompt=create`), a fresh sign-in
+    /// (`prompt=login`), the account chooser (`prompt=select_account`), a recent one (`max_age`); empty for a plain
+    /// sign-in, which renews silently.
+    public static func asks(_ items: [URLQueryItem]) -> [String: String] {
+        var asks: [String: String] = [:]
+        if let prompt = items.first(where: { $0.name == "prompt" })?.value, ["create", "login", "select_account"].contains(prompt) {
+            asks["prompt"] = prompt
+        }
+        if let age = items.first(where: { $0.name == "max_age" })?.value, let seconds = Int(age), seconds >= 0 { asks["max_age"] = String(seconds) }
+        return asks
+    }
+
     /// Where to go once signed in: the sign-in's `next` when it is a page of the site's own (never the sign-in or
     /// sign-out again), else the site's home. [next] is the decoded query value.
     public static func after(_ origin: AppOrigin, next: String?) -> String {

@@ -66,6 +66,11 @@ final class OriginAndPolicyTests: XCTestCase {
         XCTAssertEqual(SignInRoute.after(origin, next: "/auth/login/"), "https://app.example.org/")
         XCTAssertEqual(SignInRoute.after(origin, next: "https://evil.io/"), "https://app.example.org/")
         XCTAssertEqual(SignInRoute.after(origin, next: nil), "https://app.example.org/")
+        let items = { (query: String) in URLComponents(string: "https://app.example.org/auth/login/?" + query)!.queryItems ?? [] }
+        XCTAssertEqual(SignInRoute.asks(items("next=/x/")), [:], "a plain sign-in renews silently")
+        XCTAssertEqual(SignInRoute.asks(items("prompt=create&next=/x/")), ["prompt": "create"], "a sign-up")
+        XCTAssertEqual(SignInRoute.asks(items("prompt=select_account&max_age=0")), ["prompt": "select_account", "max_age": "0"])
+        XCTAssertEqual(SignInRoute.asks(items("prompt=none&max_age=-1")), [:], "nothing else is passed on")
     }
 
     func testRoutePathKeepsTheTrailingSlash() {

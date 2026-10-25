@@ -214,7 +214,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         // The site's own origin every member; the account service's its sign-in; the payment service's (its frames too)
         // the outside step.
         let roles = [NativeShim.Role(origin: origin, members: methods.map { $0.0 }),
-                     NativeShim.Role(origin: auth, members: ["completeSignIn", "nativeSignIn"])]
+                     NativeShim.Role(origin: auth, members: methods.map { $0.0 }.filter { $0 == "nativeSignIn" })]
             + payment.map { NativeShim.Role(origin: $0, members: ["openOutside"], frames: true) }
         let bridge = NativeBridge(roles: roles, methods: Dictionary(methods, uniquingKeysWith: { first, _ in first }))
         let script = NativeShim.script(roles: roles, version: session.config.versionName, features: session.features)
@@ -292,10 +292,18 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 decisionHandler(.allow)
             }
         case .signIn:
-            // NEVER SIGN IN IN THE WEB VIEW: the session is renewed, then the sign-in's `next` opens.
+            // NEVER THE SITE'S WEB SIGN-IN: a plain `/auth/login/` renews the session silently, then its `next` opens; one
+            // asking for a sign-up or a fresh sign-in (`prompt`, `max_age`) starts the account service's own with those.
             decisionHandler(.cancel)
-            let next = isSite ? URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "next" }?.value : nil
-            renewThen(SignInRoute.after(origin, next: next))
+            let items = isSite ? URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] : []
+            let next = items.first { $0.name == "next" }?.value
+            let extra = SignInRoute.asks(items)
+            if extra.isEmpty {
+                renewThen(SignInRoute.after(origin, next: next))
+            } else {
+                afterSignIn = SignInRoute.after(origin, next: next)
+                startBrowserSignIn(extra: extra)
+            }
         case .openNative:
             decisionHandler(.cancel)
             // Back from the native screen lands on a page of the site, never on the account service's callback that redirected here.
@@ -614,15 +622,15 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
-    /// One button: the account service's sign-in, in the web view (finished by `completeSignIn` or the redirect), or in
-    /// the system sheet until the account service calls the shell; with no network, the sign-in says so (and offers what
-    /// is kept).
-    private func startBrowserSignIn() {
+    /// One button: the account service's sign-in, in the web view (finished by its redirect, caught), or in the system
+    /// sheet as the fallback; with no network, the sign-in says so (and offers what is kept). [extra]: the site's asks
+    /// (`prompt=create` for a sign-up).
+    private func startBrowserSignIn(extra: [String: String] = [:]) {
         guard network.online else { return show(.offlineSignIn) }
         show(.working)
         if session.config.signInInWebView {
             Task {
-                guard let (url, request) = await browser.prepare() else { return show(.offlineSignIn) }
+                guard let (url, request) = await browser.prepare(extra: extra) else { return show(.offlineSignIn) }
                 pendingSignIn = request
                 hidePanel()
                 webView.load(URLRequest(url: url))
@@ -630,7 +638,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             return
         }
         Task {
-            switch await browser.start(from: view.window) {
+            switch await browser.start(from: view.window, extra: extra) {
             case .cancelled: show(.signIn)
             case .failed: show(.failed)
             case .offline: show(.offlineSignIn)
@@ -663,7 +671,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
-    /// The account service's code for the sign-in running in the web view, by `completeSignIn` or its redirect.
+    /// The account service's code for the sign-in running in the web view, from its redirect.
     private func completeWebSignIn(code: String?, state: String?) async -> JSONObject {
         guard let request = pendingSignIn, let code, !code.isEmpty, state == request.state else { return NativeBridge.refused("invalid_state") }
         pendingSignIn = nil
@@ -758,31 +766,31 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     // MARK: - The core's members
 
     private func coreMethods() -> [(String, NativeBridge.Method)] {
-        [
+        var members: [(String, NativeBridge.Method)] = [
             ("openSettings", { [weak self] _, answer in
                 guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
                 self.openSettings()
                 answer(NativeBridge.ok())
             }),
-            ("completeSignIn", { [weak self] args, answer in
-                guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
-                Task { answer(await self.completeWebSignIn(code: args?["code"] as? String, state: args?["state"] as? String)) }
-            }),
-            ("nativeSignIn", { [weak self] args, answer in
+        ]
+        // The account service offers Google through the app only when the app has a Google client.
+        if session.config.googleClientID != nil {
+            members.append(("nativeSignIn", { [weak self] args, answer in
                 guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
                 self.nativeSignIn.start(args, window: self.view.window, answer: answer)
-            }),
-            ("openOutside", { [weak self] args, answer in
-                guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
-                Task { answer(await self.runOutside(url: args?["url"] as? String, returnURL: args?["returnUrl"] as? String)) }
-            }),
-            ("network", { [weak self] _, answer in
-                answer(self?.networkState() ?? ["online": true, "offlinePage": false, "savedAt": NSNull()])
-            }),
-            ("consent", { [weak self] _, answer in
-                answer(self?.session.consent?.state() ?? [:])
-            }),
-        ]
+            }))
+        }
+        members.append(("openOutside", { [weak self] args, answer in
+            guard let self else { return answer(NativeBridge.refused(NativeShim.errorUnavailable)) }
+            Task { answer(await self.runOutside(url: args?["url"] as? String, returnURL: args?["returnUrl"] as? String)) }
+        }))
+        members.append(("network", { [weak self] _, answer in
+            answer(self?.networkState() ?? ["online": true, "offlinePage": false, "savedAt": NSNull()])
+        }))
+        members.append(("consent", { [weak self] _, answer in
+            answer(self?.session.consent?.state() ?? [:])
+        }))
+        return members
     }
 
     /// The app's native Settings ([SettingsViewController]).
