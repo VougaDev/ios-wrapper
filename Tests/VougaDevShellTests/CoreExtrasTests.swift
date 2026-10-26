@@ -80,14 +80,15 @@ final class EdgeAndSignInTests: XCTestCase {
         XCTAssertFalse(ShellViewController.isRestart(edgeAnswered: false, online: true), "no answer at all: offline")
     }
 
-    func testTheSiteIsBackOnlyWithItsOwnPage() {
-        let site = "<head><meta name=\"vougadev-page\" content=\"motor\"><title>Motor</title>"
-        XCTAssertTrue(ShellViewController.isBack(status: 200, html: site, marker: nil))
-        XCTAssertTrue(ShellViewController.isBack(status: 302, html: "", marker: nil), "the site's redirect to its sign-in")
-        XCTAssertTrue(ShellViewController.isBack(status: 200, html: "<nav class=\"ship-bar\">", marker: "ship-bar"))
-        XCTAssertFalse(ShellViewController.isBack(status: 502, html: site, marker: nil))
-        XCTAssertFalse(ShellViewController.isBack(status: 503, html: "<h1>503 Service Unavailable</h1>", marker: nil))
-        XCTAssertFalse(ShellViewController.isBack(status: 200, html: "<h1>Maintenance</h1>", marker: "ship-bar"))
+    func testTheSitesOwnAnswersAreNeverReplacedMetaOrNot() {
+        // a CV, an invoice, a ticket, a PDF without the meta (Jobs' CV, Echo on the WP35, 2026-10-26)
+        for status in [nil, 200, 201, 302, 400, 403, 404] as [Int?] { XCTAssertFalse(ShellViewController.checksMeta(status: status), "\(String(describing: status))") }
+        for status in [500, 501, 505] { XCTAssertTrue(ShellViewController.checksMeta(status: status), "\(status)") }
+    }
+
+    func testTheSiteIsBackWithAnyAnswerUnder500() {
+        for status in [200, 302, 404] { XCTAssertTrue(ShellViewController.isBack(status: status), "\(status)") }
+        for status in [500, 502, 503, 504] { XCTAssertFalse(ShellViewController.isBack(status: status), "\(status)") }
     }
 
     func testGooglesSignInForAnIOSClient() {

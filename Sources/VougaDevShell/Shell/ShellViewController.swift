@@ -370,9 +370,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         notifyNetwork()
         guard let url = webView.url else { return }
         let config = session.config
-        // A company page of the site's or the payment service's origin carries the company's meta (or the site's older
-        // marker): without it, it is an edge's or a CDN's error page, never shown.
-        if showingKept == nil, config.requirePageMeta || config.siteMarker != nil, mainMIME == "text/html",
+        // A 5xx of the site's or the payment service's origin carries the company's meta (or the site's older marker):
+        // without it, it is an edge's or a CDN's error page, never shown. Any other answer is the site's own (a CV, an
+        // invoice, a PDF), shown meta or not.
+        if showingKept == nil, Self.checksMeta(status: mainStatus), config.requirePageMeta || config.siteMarker != nil, mainMIME == "text/html",
            origin.matches(url) || payment.contains(where: { $0.matches(url) }) {
             let marker = config.siteMarker.map { "document.documentElement.outerHTML.indexOf(\(NativeShim.quote($0))) >= 0" } ?? "false"
             let check = "!!document.querySelector('meta[name=\"vougadev-page\"]') || \(marker)"
@@ -425,11 +426,11 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// Offline only without a network: an edge that answered proves the connection works.
     nonisolated static func isRestart(edgeAnswered: Bool, online: Bool) -> Bool { edgeAnswered && online }
 
-    /// The site is back: a redirect of its own, or a page under 500 carrying the company-page meta (or its [marker]).
-    nonisolated static func isBack(status: Int, html: String, marker: String?) -> Bool {
-        if (300..<400).contains(status) { return true }
-        return status < 500 && (html.contains("name=\"vougadev-page\"") || marker.map { html.contains($0) } == true)
-    }
+    /// Only a 5xx may be the edge's: a 2xx, 3xx or 4xx is the site's own answer, never replaced, meta or not.
+    nonisolated static func checksMeta(status: Int?) -> Bool { (status ?? 200) >= 500 }
+
+    /// The site is back, asked again during a restart: any answer under 500 is its own.
+    nonisolated static func isBack(status: Int) -> Bool { status < 500 }
 
     /// Every few seconds while the app is in front, [url] is asked of the site: once it answers, the page.
     private func watchRestart(_ url: URL?) {
@@ -442,8 +443,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 var request = URLRequest(url: target, timeoutInterval: 15)
                 request.setValue(self.session.userAgent, forHTTPHeaderField: "User-Agent")
                 guard let answer = try? await self.session.transport.send(request),
-                      ShellViewController.isBack(status: answer.1.statusCode, html: String(decoding: answer.0, as: UTF8.self),
-                                                 marker: self.session.config.siteMarker), self.restarting else { continue }
+                      ShellViewController.isBack(status: answer.1.statusCode), self.restarting else { continue }
                 self.restarting = false
                 if let kept = self.showingKept {
                     self.webView.load(URLRequest(url: kept))
