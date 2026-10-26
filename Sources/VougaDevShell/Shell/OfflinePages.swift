@@ -194,10 +194,11 @@ final class OfflineBar: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Built in code") }
 
-    func show(savedAt: Date) {
+    /// [restarting]: the network works, the service is restarting - never "offline".
+    func show(savedAt: Date, restarting: Bool = false) {
         let today = Calendar.current.isDateInToday(savedAt)
         let when = DateFormatter.localizedString(from: savedAt, dateStyle: today ? .none : .short, timeStyle: .short)
-        label.text = String(format: Strings.text("shell_offline_bar"), when)
+        label.text = String(format: Strings.text(restarting ? "shell_restarting_bar" : "shell_offline_bar"), when)
         isHidden = false
     }
 }

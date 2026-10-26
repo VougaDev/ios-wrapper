@@ -46,4 +46,7 @@
 "shell_offline_welcome" = "Connect to the Internet once to start. What you view then stays available on this phone, even offline.";
 "shell_signin_offline_kept" = "Offline: signing in will be possible as soon as the network returns. In the meantime, these screens remain available:";
 "shell_offline_home" = "Home";
+"shell_restarting_bar" = "Service restarting · updated at %@";
+"shell_restarting_title" = "The service is restarting";
+"shell_restarting_text" = "Your connection works. This screen opens by itself as soon as the service answers again.";
 "shell_back" = "Back";

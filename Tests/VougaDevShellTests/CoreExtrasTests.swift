@@ -74,6 +74,22 @@ final class EdgeAndSignInTests: XCTestCase {
         for status in [200, 400, 403, 404, 500] { XCTAssertFalse(ShellViewController.isEdgeError(status), "\(status): the site's own page") }
     }
 
+    func testAnEdgeThatAnsweredIsARestartNeverOffline() {
+        XCTAssertTrue(ShellViewController.isRestart(edgeAnswered: true, online: true), "a 502 during a release: restarting")
+        XCTAssertFalse(ShellViewController.isRestart(edgeAnswered: true, online: false), "no network: offline")
+        XCTAssertFalse(ShellViewController.isRestart(edgeAnswered: false, online: true), "no answer at all: offline")
+    }
+
+    func testTheSiteIsBackOnlyWithItsOwnPage() {
+        let site = "<head><meta name=\"vougadev-page\" content=\"motor\"><title>Motor</title>"
+        XCTAssertTrue(ShellViewController.isBack(status: 200, html: site, marker: nil))
+        XCTAssertTrue(ShellViewController.isBack(status: 302, html: "", marker: nil), "the site's redirect to its sign-in")
+        XCTAssertTrue(ShellViewController.isBack(status: 200, html: "<nav class=\"ship-bar\">", marker: "ship-bar"))
+        XCTAssertFalse(ShellViewController.isBack(status: 502, html: site, marker: nil))
+        XCTAssertFalse(ShellViewController.isBack(status: 503, html: "<h1>503 Service Unavailable</h1>", marker: nil))
+        XCTAssertFalse(ShellViewController.isBack(status: 200, html: "<h1>Maintenance</h1>", marker: "ship-bar"))
+    }
+
     func testGooglesSignInForAnIOSClient() {
         XCTAssertEqual(NativeSignIn.googleScheme("1234-abcd.apps.googleusercontent.com"), "com.googleusercontent.apps.1234-abcd")
         let request = AuthorizeRequest(state: "st", nonce: "no", verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")

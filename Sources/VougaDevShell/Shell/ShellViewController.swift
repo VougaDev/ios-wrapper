@@ -35,7 +35,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     private var pendingSignIn: AuthorizeRequest?
     /// The MIME type of the last main-frame answer: only an HTML page is checked for the site's marker.
     private var mainMIME: String?
-    private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlineMissing, offlineWelcome, askPush }
+    private enum Screen { case working, signingOut, signIn, failed, offlineSignIn, offlineMissing, offlineWelcome, restarting, askPush }
 
     private var screen: Screen?
     /// The page to open once the session is open (the sign-in's `next`).
@@ -53,6 +53,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     /// The status of the last main-frame answer: only a 200 is kept.
     private var mainStatus: Int?
     private var firstPageShown = false
+    /// The site's edge answered instead of the site (a release restarts it) on a working network: the person reads that
+    /// the service is restarting - never "offline" - and [watchRestart] asks the site again until it answers.
+    private var restarting = false
+    private var restartWatch: Task<Void, Never>?
 
     public init(session: AppSession) {
         self.session = session
@@ -339,20 +343,21 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             if let simulated = session.config.simulatedEdgeStatus { mainStatus = simulated }
             if let status = mainStatus, Self.isEdgeError(status) {
                 decisionHandler(.cancel)
-                return offlineFallback(response.url)
+                return offlineFallback(response.url, edge: true)
             }
         }
         decisionHandler(.allow)
     }
 
     public func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        if screen == .offlineMissing || screen == .offlineWelcome { hidePanel() }
+        if screen == .offlineMissing || screen == .offlineWelcome || screen == .restarting { hidePanel() }
         failedURL = nil
         firstPageShown = true
         if loadingKept {
             loadingKept = false
         } else {
             showingKept = nil
+            restarting = false
             offlineBar.isHidden = true
         }
     }
@@ -373,7 +378,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             let check = "!!document.querySelector('meta[name=\"vougadev-page\"]') || \(marker)"
             webView.evaluateJavaScript(check) { [weak self] found, _ in
                 guard let self else { return }
-                if (found as? Bool) == false { return self.offlineFallback(url) }
+                if (found as? Bool) == false { return self.offlineFallback(url, edge: true) }
                 if self.origin.matches(url) { self.siteFinished(webView) }
             }
             return
@@ -405,14 +410,52 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
     // MARK: - No network
 
     /// A page that could not load: its kept copy; at launch the last page kept; else what is kept, or the welcome when
-    /// nothing is. Never a dead end (App Review 4.2).
-    private func offlineFallback(_ url: URL?) {
+    /// nothing is. Never a dead end (App Review 4.2). [edge]: the edge answered instead of the site - with a network,
+    /// the service is restarting, never "offline", and the site is asked again by itself.
+    private func offlineFallback(_ url: URL?, edge: Bool = false) {
+        restarting = Self.isRestart(edgeAnswered: edge, online: network.online)
+        if restarting { watchRestart(url) }
         let pages = session.offlinePages
         if let url, let kept = pages.entry(for: url) { return showKept(kept) }
         if !firstPageShown, let last = pages.entries.first { return showKept(last) }
         failedURL = url
-        show(pages.entries.isEmpty ? .offlineWelcome : .offlineMissing)
+        show(restarting ? .restarting : pages.entries.isEmpty ? .offlineWelcome : .offlineMissing)
     }
+
+    /// Offline only without a network: an edge that answered proves the connection works.
+    nonisolated static func isRestart(edgeAnswered: Bool, online: Bool) -> Bool { edgeAnswered && online }
+
+    /// The site is back: a redirect of its own, or a page under 500 carrying the company-page meta (or its [marker]).
+    nonisolated static func isBack(status: Int, html: String, marker: String?) -> Bool {
+        if (300..<400).contains(status) { return true }
+        return status < 500 && (html.contains("name=\"vougadev-page\"") || marker.map { html.contains($0) } == true)
+    }
+
+    /// Every few seconds while the app is in front, [url] is asked of the site: once it answers, the page.
+    private func watchRestart(_ url: URL?) {
+        guard restartWatch == nil, let target = url ?? URL(string: home) else { return }
+        restartWatch = Task { [weak self] in
+            defer { self?.restartWatch = nil }
+            while let self, self.restarting {
+                try? await Task.sleep(nanoseconds: ShellViewController.restartRetryNanos)
+                guard self.restarting, UIApplication.shared.applicationState == .active, self.network.online else { continue }
+                var request = URLRequest(url: target, timeoutInterval: 15)
+                request.setValue(self.session.userAgent, forHTTPHeaderField: "User-Agent")
+                guard let answer = try? await self.session.transport.send(request),
+                      ShellViewController.isBack(status: answer.1.statusCode, html: String(decoding: answer.0, as: UTF8.self),
+                                                 marker: self.session.config.siteMarker), self.restarting else { continue }
+                self.restarting = false
+                if let kept = self.showingKept {
+                    self.webView.load(URLRequest(url: kept))
+                } else if self.screen == .restarting {
+                    self.hidePanel()
+                    self.webView.load(URLRequest(url: self.failedURL ?? target))
+                }
+            }
+        }
+    }
+
+    private static let restartRetryNanos: UInt64 = 5_000_000_000
 
     /// A kept page in the web view, at its own address (the bridge and the page's scripts see the site's origin), under
     /// the "Offline · updated at" bar.
@@ -423,7 +466,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         hidePanel()
         showingKept = url
         loadingKept = true
-        offlineBar.show(savedAt: entry.savedAt)
+        offlineBar.show(savedAt: entry.savedAt, restarting: restarting)
         webView.load(data, mimeType: "application/x-webarchive", characterEncodingName: "utf-8", baseURL: url)
     }
 
@@ -544,6 +587,10 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                        image: UIImage(systemName: "wifi.slash"), rows: keptRows())
         case .offlineWelcome:
             panel.show(title: name, text: Strings.text("shell_offline_welcome"), button: nil, image: mark, brand: true, busy: false)
+        case .restarting:
+            panel.show(title: Strings.text("shell_restarting_title"), text: Strings.text("shell_restarting_text"),
+                       button: Strings.text("shell_load_error_retry"), image: UIImage(systemName: "arrow.clockwise"),
+                       rows: keptRows(), busy: true)
         case .askPush:
             panel.show(title: name, text: Strings.text("shell_push_text"), button: Strings.text("shell_push_continue"),
                        link: Strings.text("shell_push_later"), image: UIImage(systemName: "bell.badge"))
@@ -569,7 +616,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         switch screen {
         case .offlineSignIn: renewThen(afterSignIn)
         case .signIn, .failed: startBrowserSignIn()
-        case .offlineMissing:
+        case .offlineMissing, .restarting:
             hidePanel()
             webView.load(URLRequest(url: failedURL ?? URL(string: home)!))
         case .askPush:

@@ -46,4 +46,7 @@
 "shell_offline_welcome" = "Conéctese a Internet una primera vez para empezar. Lo que consulte seguirá disponible en este teléfono, incluso sin conexión.";
 "shell_signin_offline_kept" = "Sin conexión: podrá iniciar sesión en cuanto vuelva la red. Mientras tanto, estas pantallas siguen disponibles:";
 "shell_offline_home" = "Inicio";
+"shell_restarting_bar" = "El servicio se está reiniciando · actualizado a las %@";
+"shell_restarting_title" = "El servicio se está reiniciando";
+"shell_restarting_text" = "Su conexión funciona. Esta pantalla se abre sola en cuanto el servicio vuelva a responder.";
 "shell_back" = "Atrás";

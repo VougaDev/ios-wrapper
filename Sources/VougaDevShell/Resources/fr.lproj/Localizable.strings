@@ -46,4 +46,7 @@
 "shell_offline_welcome" = "Connectez-vous à Internet une première fois pour commencer. Ce que vous consultez reste ensuite disponible sur ce téléphone, même hors connexion.";
 "shell_signin_offline_kept" = "Hors connexion : la connexion à votre compte sera possible dès le retour du réseau. En attendant, ces écrans restent disponibles :";
 "shell_offline_home" = "Accueil";
+"shell_restarting_bar" = "Le service redémarre · mis à jour à %@";
+"shell_restarting_title" = "Le service redémarre";
+"shell_restarting_text" = "Votre connexion fonctionne. Cet écran s'ouvre de lui-même dès que le service répond à nouveau.";
 "shell_back" = "Retour";
