@@ -167,9 +167,10 @@ final class OfflineMapTests: XCTestCase {
     }
 
     func testTheManifest() {
-        let sets = Tileset.parse(json(#"{"available": true, "tilesets": [{"source": "gabon", "name": "gabon-2026", "size": 12, "version": "v3", "url": "/media/map/gabon.mbtiles"}, {"name": "../x", "url": "/a"}, {"name": "far", "url": "https://evil.io/f"}]}"#))
+        let config = OfflineMapConfig(manifestPath: "/api/map/offline", tilePath: "/tiles/{source}/{z}/{x}/{y}")
+        let sets = Tileset.parse(json(#"{"available": true, "tilesets": [{"source": "gabon", "name": "gabon-2026", "size": 12, "version": "v3", "url": "/media/map/gabon.mbtiles"}, {"name": "../x", "url": "/a"}, {"name": "far", "url": "https://evil.io/f"}]}"#), config: config)
         XCTAssertEqual(sets, [Tileset(source: "gabon", name: "gabon-2026", size: 12, version: "v3", url: "/media/map/gabon.mbtiles")])
-        XCTAssertEqual(Tileset.parse(json(#"{"available": false, "tilesets": [{"name": "a", "url": "/a"}]}"#)), [])
+        XCTAssertEqual(Tileset.parse(json(#"{"available": false, "tilesets": [{"name": "a", "url": "/a"}]}"#), config: config), [])
     }
 
     func testGzippedTilesAreInflated() {
