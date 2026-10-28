@@ -85,6 +85,15 @@ real extension**: an app whose `features()` is empty is a web clipping (App Revi
   from them, so the site's maps keep working with no network. WebKit answers only an app's own URL schemes, so a
   document-start script sends those requests (from the page and the workers it starts) to `vougadev-tiles:`, answered
   from the file, else from the network with the web view's session. Settings shows the size and deletes them.
+  **A shared map server** (`tileOrigins: ["https://maps.vougadev.com"]`, exact https origins): a tileset's `url` may be
+  an https URL there with an optional `token`, downloaded with `Authorization: Bearer <token>` and none of the site's
+  cookies (the token serves that download only, never kept); `version` is its ETag, `name` may end in `.mbtiles`.
+  Every request the pages make to that origin goes to `vougadev-tiles://<host>/…` too: a tile from its region's file,
+  online too; the style, glyphs and sprite from the network with the page's own headers (its bearer), kept while a
+  region is on the phone and answered from there offline. Every answer carries `Access-Control-Allow-Origin: <the
+  site's origin>`, and a CORS preflight is answered on the phone. The site allows `vougadev-tiles:` in `connect-src`
+  and drops `Authorization` while offline (`navigator.onLine` false, in MapLibre's synchronous `transformRequest`), as
+  on Android.
 - **An app's own** (Ship's `missions`): in the app's repository, the same protocol.
 
 ## An app on the shell
@@ -117,7 +126,8 @@ The app's own repository holds an `ios/` folder: copy [Example](Example) and cha
 
    let session = AppSession(config: .app, extensions: [
        TrackingExtension(paths: TrackingPaths(position: "/api/…/{id}/position", target: "/api/…/tracking")),
-       OfflineMapExtension(config: OfflineMapConfig(manifestPath: "/api/…/offline", tilePath: "/tiles/{source}/{z}/{x}/{y}")),
+       OfflineMapExtension(config: OfflineMapConfig(manifestPath: "/api/…/offline", tilePath: "/tiles/{source}/{z}/{x}/{y}",
+                                                    tileOrigins: ["https://maps.vougadev.com"])),
    ])
    ```
 

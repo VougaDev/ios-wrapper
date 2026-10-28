@@ -1,3 +1,4 @@
+import CryptoKit
 import Network
 import SQLite3
 import UIKit
@@ -7,19 +8,38 @@ import WebKit
 /// What the `offline-map` extension needs from the app's site:
 ///
 /// - [manifestPath]: lists the regions this person may keep:
-///   `{"available": true, "tilesets": [{"source", "name", "size", "version", "url"}]}` (`url` a same-origin path of an
-///   `.mbtiles` file);
+///   `{"available": true, "tilesets": [{"source", "name", "size", "version", "url", "token"}]}` (`url` a same-origin
+///   path of an `.mbtiles` file, or an https URL on one of [tileOrigins] with an optional bearer `token`);
 /// - [tilePath]: one tile as the site's map pages request it, `{source}`, `{z}`, `{x}` and `{y}` marked, e.g.
-///   `/tiles/{source}/{z}/{x}/{y}`: such a request is answered from the phone when its region is there.
+///   `/tiles/{source}/{z}/{x}/{y}`: such a request is answered from the phone when its region is there;
+/// - [tileOrigins]: the shared map servers the site's pages take their map from (exact `https://host` origins, e.g.
+///   `https://maps.vougadev.com`): their tiles are answered from the phone too, their style, glyphs and sprite kept for
+///   offline, and a tileset's file may be downloaded from them.
 public struct OfflineMapConfig: Sendable {
     public let manifestPath: String
     public let tilePath: String
+    public let tileOrigins: [String]
 
-    public init(manifestPath: String, tilePath: String) {
+    public init(manifestPath: String, tilePath: String, tileOrigins: [String] = []) {
         precondition(manifestPath.hasPrefix("/") && !manifestPath.hasPrefix("//"), "manifestPath: \(manifestPath)")
         precondition(TilePath(tilePath) != nil, "tilePath needs {source}, {z}, {x} and {y}: \(tilePath)")
+        tileOrigins.forEach { precondition(Self.isOrigin($0), "tileOrigins: an https origin, no path: \($0)") }
         self.manifestPath = manifestPath
         self.tilePath = tilePath
+        self.tileOrigins = tileOrigins
+    }
+
+    /// The origin of [url] when it is one of [tileOrigins], else nil.
+    public func tileOrigin(of url: String?) -> String? {
+        guard let url, let parts = URLComponents(string: url), parts.scheme?.lowercased() == "https", let host = parts.host?.lowercased() else { return nil }
+        let origin = "https://" + host + (parts.port.map { $0 == 443 ? "" : ":\($0)" } ?? "")
+        return tileOrigins.contains(origin) ? origin : nil
+    }
+
+    static func isOrigin(_ value: String) -> Bool {
+        guard let parts = URLComponents(string: value), parts.scheme == "https", let host = parts.host, !host.isEmpty,
+              host == host.lowercased(), parts.path.isEmpty, parts.query == nil, parts.fragment == nil, parts.user == nil else { return false }
+        return value == "https://" + host + (parts.port.map { ":\($0)" } ?? "")
     }
 }
 
@@ -72,21 +92,27 @@ public struct TilePath: Sendable {
     var javaScriptPattern: String { pattern }
 }
 
-/// One region the site lists ([OfflineMapConfig.manifestPath]).
+/// One region the site lists ([OfflineMapConfig.manifestPath]). [url] is a same-origin path, or an https URL on one of
+/// the tile origins; [token] goes with that download only and is never kept.
 public struct Tileset: Equatable, Sendable {
     public let source: String, name: String, size: Int64, version: String, url: String
+    public var token: String? = nil
 
     static let namePattern = "^[A-Za-z0-9_-]+$"
+    static let tokenPattern = "^[A-Za-z0-9._~+/=-]+$"
 
-    public static func parse(_ body: JSONObject?) -> [Tileset] {
+    public static func parse(_ body: JSONObject?, config: OfflineMapConfig) -> [Tileset] {
         guard let body, body["available"] as? Bool != false, let rows = body["tilesets"] as? [JSONObject] else { return [] }
         return rows.compactMap { row in
-            let name = row["name"] as? String ?? ""
+            var name = row["name"] as? String ?? ""
+            if name.hasSuffix(".mbtiles") { name.removeLast(".mbtiles".count) }
             let url = row["url"] as? String ?? ""
-            guard name.range(of: namePattern, options: .regularExpression) != nil, url.hasPrefix("/"), !url.hasPrefix("//") else { return nil }
+            let sameOrigin = url.hasPrefix("/") && !url.hasPrefix("//")
+            guard name.range(of: namePattern, options: .regularExpression) != nil, sameOrigin || config.tileOrigin(of: url) != nil else { return nil }
             let source = (row["source"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? name
+            let token = (row["token"] as? String).flatMap { !sameOrigin && $0.range(of: tokenPattern, options: .regularExpression) != nil ? $0 : nil }
             return Tileset(source: source, name: name, size: (row["size"] as? NSNumber)?.int64Value ?? 0,
-                           version: row["version"] as? String ?? "", url: url)
+                           version: row["version"] as? String ?? "", url: url, token: token)
         }
     }
 }
@@ -97,7 +123,9 @@ public struct Tileset: Equatable, Sendable {
 ///
 /// WebKit lets an app answer only its own URL schemes, so a document-start script (main frame, and the workers the map
 /// starts) sends the site's same-origin tile requests to `vougadev-tiles:`; this answers from the region's `.mbtiles`
-/// file, else from the network with the web view's session, as the page would have.
+/// file, else from the network with the web view's session, as the page would have. A site whose map comes from a
+/// shared map server ([OfflineMapConfig.tileOrigins]) has every request to it sent there too: tiles from the file,
+/// style, glyphs and sprite kept for offline, the bearer the page set used for the network, never the site's cookies.
 @MainActor
 public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHandler {
 
@@ -134,7 +162,8 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
         configuration.setURLSchemeHandler(self, forURLScheme: Self.scheme)
         guard let origin = session?.origin else { return }
         configuration.userContentController.addUserScript(
-            WKUserScript(source: Self.script(origin: origin.originString, pattern: tiles.javaScriptPattern), injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            WKUserScript(source: Self.script(origin: origin.originString, pattern: tiles.javaScriptPattern, tileOrigins: config.tileOrigins),
+                         injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
     }
 
@@ -188,22 +217,19 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
     public func sync() async -> Int {
         guard let session, await Self.onWiFi() else { return 0 }
         guard case let .ok(body) = await session.caller().get(config.manifestPath) else { return 0 }
-        let tilesets = Tileset.parse(body)
-        guard !tilesets.isEmpty, let jar = await session.cookies.jar(), !jar.isEmpty else { return 0 }
+        let tilesets = Tileset.parse(body, config: config)
+        guard !tilesets.isEmpty else { return 0 }
+        let jar = await session.cookies.jar()
         var versions = defaults.dictionary(forKey: "offlineMap.versions") as? [String: String] ?? [:]
         var sources = defaults.dictionary(forKey: "offlineMap.sources") as? [String: String] ?? [:]
         var arrived = 0
         for tileset in tilesets {
             let file = dir.appendingPathComponent("\(tileset.name).mbtiles")
             if FileManager.default.fileExists(atPath: file.path) && versions[tileset.name] == tileset.version { continue }
-            guard let url = URL(string: session.origin.baseURL + tileset.url),
-                  let headers = AppHttp.headers(origin: session.origin, cookies: jar, userAgent: session.userAgent,
-                                                acceptLanguage: AppHttp.acceptLanguage(AppHttp.phoneLanguages()), unsafe: false) else { continue }
-            var request = URLRequest(url: url)
-            headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-            request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+            guard let request = Self.downloadRequest(tileset, session: session, jar: jar) else { continue }
             guard let (temp, response) = try? await URLSession.shared.download(for: request),
-                  (response as? HTTPURLResponse)?.statusCode == 200 else { continue }
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  tileset.size <= 0 || (try? temp.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) == tileset.size else { continue }
             reader.close(file)
             _ = try? FileManager.default.replaceItemAt(file, withItemAt: temp)
             versions[tileset.name] = tileset.version
@@ -213,6 +239,28 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
         defaults.set(versions, forKey: "offlineMap.versions")
         defaults.set(sources, forKey: "offlineMap.sources")
         return arrived
+    }
+
+    /// A same-origin file as the web view's session; one on a tile origin with its bearer only, never the site's cookies.
+    static func downloadRequest(_ tileset: Tileset, session: AppSession, jar: String?) -> URLRequest? {
+        let language = AppHttp.acceptLanguage(AppHttp.phoneLanguages())
+        var request: URLRequest
+        if tileset.url.hasPrefix("/") {
+            guard let jar, !jar.isEmpty, let url = URL(string: session.origin.baseURL + tileset.url),
+                  let headers = AppHttp.headers(origin: session.origin, cookies: jar, userAgent: session.userAgent,
+                                                acceptLanguage: language, unsafe: false) else { return nil }
+            request = URLRequest(url: url)
+            headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        } else {
+            guard let url = URL(string: tileset.url) else { return nil }
+            request = URLRequest(url: url)
+            request.httpShouldHandleCookies = false
+            request.setValue(session.userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue(language, forHTTPHeaderField: "Accept-Language")
+            if let token = tileset.token { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
+        }
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+        return request
     }
 
     nonisolated static func onWiFi() async -> Bool {
@@ -228,17 +276,20 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
 
     // MARK: - The page's tile requests
 
-    /// Same-origin tile URLs (by [pattern], on [origin]) go to `vougadev-tiles://tile<path>`; anything else is untouched.
-    /// Workers the page starts (the map's) get the same rewriting first.
-    nonisolated static func script(origin: String, pattern: String) -> String {
+    /// Same-origin tile URLs (by [pattern], on [origin]) go to `vougadev-tiles://tile<path>`, every request to one of
+    /// [tileOrigins] to `vougadev-tiles://<host><path and query>` (its headers kept: the bearer); anything else is
+    /// untouched. Workers the page starts (the map's) get the same rewriting first.
+    nonisolated static func script(origin: String, pattern: String, tileOrigins: [String] = []) -> String {
         let originLiteral = String(decoding: (try? JSONSerialization.data(withJSONObject: [origin])) ?? Data("[\"\"]".utf8), as: UTF8.self)
         let patternLiteral = String(decoding: (try? JSONSerialization.data(withJSONObject: [pattern])) ?? Data("[\"\"]".utf8), as: UTF8.self)
+        let mapsLiteral = String(decoding: (try? JSONSerialization.data(withJSONObject: tileOrigins)) ?? Data("[]".utf8), as: UTF8.self)
         let rewrite = """
-        var ORIGIN = \(originLiteral)[0], TILE = new RegExp(\(patternLiteral)[0]);
+        var ORIGIN = \(originLiteral)[0], TILE = new RegExp(\(patternLiteral)[0]), MAPS = \(mapsLiteral);
         function vdTile(u) {
           try {
             var url = new URL(typeof u === "string" ? u : (u && u.url) || String(u), self.location.href);
             if (url.origin === ORIGIN && TILE.test(url.pathname)) { return "\(scheme)://tile" + url.pathname; }
+            if (MAPS.indexOf(url.origin) >= 0) { return "\(scheme)://" + url.host + url.pathname + url.search; }
           } catch (e) {}
           return null;
         }
@@ -246,7 +297,9 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
         if (vdFetch) {
           self.fetch = function (input, init) {
             var t = vdTile(input);
-            return vdFetch.call(this, t ? t : input, t && init ? Object.assign({}, init, { credentials: "omit", mode: "cors" }) : init);
+            if (!t) { return vdFetch.call(this, input, init); }
+            var base = init || (input && typeof input === "object" && input.headers ? { headers: input.headers, signal: input.signal } : {});
+            return vdFetch.call(this, t, Object.assign({}, base, { credentials: "omit", mode: "cors" }));
           };
         }
         if (self.XMLHttpRequest) {
@@ -287,15 +340,68 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
     public func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
         let id = ObjectIdentifier(urlSchemeTask)
         running.insert(id)
-        guard let url = urlSchemeTask.request.url, let tile = tiles.match(url.path) else {
-            return finish(urlSchemeTask, id, url: urlSchemeTask.request.url, data: nil)
-        }
+        guard let url = urlSchemeTask.request.url else { return finish(urlSchemeTask, id, url: nil, data: nil) }
+        if url.host != "tile" { return answerMap(urlSchemeTask, id, url: url) }
+        guard let tile = tiles.match(url.path) else { return finish(urlSchemeTask, id, url: url, data: nil) }
         if let file = downloaded()[tile.source], let data = reader.tile(file, tile) {
             return finish(urlSchemeTask, id, url: url, data: data)
         }
         Task {
             finish(urlSchemeTask, id, url: url, data: await network(url.path))
         }
+    }
+
+    /// `vougadev-tiles://<host>/…`: a request of the page to a tile origin. Its CORS preflight is answered here; a tile
+    /// comes from its region's file, online too; the style, glyphs and sprite from the network and kept, or as kept when
+    /// the network fails. Never the site's cookies.
+    private func answerMap(_ task: WKURLSchemeTask, _ id: ObjectIdentifier, url: URL) {
+        guard let host = url.host, config.tileOrigin(of: "https://" + host + (url.port.map { ":\($0)" } ?? "")) != nil,
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return finish(task, id, url: url, data: nil) }
+        parts.scheme = "https"
+        guard let real = parts.url else { return finish(task, id, url: url, data: nil) }
+        let page = task.request
+        if page.httpMethod == "OPTIONS" {
+            return finish(task, id, url: url, data: Data(), status: 204, headers: Self.preflightHeaders(page.allHTTPHeaderFields ?? [:]))
+        }
+        let regions = downloaded()
+        if let tile = tiles.match(url.path) {
+            if let file = regions[tile.source], let data = reader.tile(file, tile) { return finish(task, id, url: url, data: data) }
+            Task {
+                let answer = await Self.fetch(real, like: page)
+                finish(task, id, url: url, data: answer?.body, type: answer?.type)
+            }
+            return
+        }
+        let dir = self.dir
+        Task {
+            var answer = await Self.fetch(real, like: page)
+            if !regions.isEmpty {
+                if let answer { KeptAnswers.save(in: dir, url: real.absoluteString, type: answer.type, body: answer.body) }
+                else { answer = KeptAnswers.read(in: dir, url: real.absoluteString) }
+            }
+            finish(task, id, url: url, data: answer?.body, type: answer?.type)
+        }
+    }
+
+    /// The page's own request to the map server (its bearer included), no cookie. Nil unless it answered 200.
+    nonisolated static func fetch(_ url: URL, like page: URLRequest) async -> (type: String, body: Data)? {
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.httpShouldHandleCookies = false
+        for (name, value) in page.allHTTPHeaderFields ?? [:] where name.caseInsensitiveCompare("Cookie") != .orderedSame {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
+        return (http.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream", data)
+    }
+
+    /// The preflight's own: GET, with the headers the page asked for (its `Authorization`), for ten minutes.
+    nonisolated static func preflightHeaders(_ request: [String: String]) -> [String: String] {
+        let asked = request.first { $0.key.caseInsensitiveCompare("Access-Control-Request-Headers") == .orderedSame }?.value ?? ""
+        let names = asked.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.range(of: "^[A-Za-z0-9-]{1,64}$", options: .regularExpression) != nil }
+        return ["Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Max-Age": "600",
+                "Access-Control-Allow-Headers": names.isEmpty ? "Authorization" : names.joined(separator: ", ")]
     }
 
     public func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
@@ -316,13 +422,15 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
         return data
     }
 
-    /// A task WebKit stopped is never answered (WebKit raises on it).
-    private func finish(_ task: WKURLSchemeTask, _ id: ObjectIdentifier, url: URL?, data: Data?) {
+    /// A task WebKit stopped is never answered (WebKit raises on it). Every answer allows the app's origin, and only it.
+    private func finish(_ task: WKURLSchemeTask, _ id: ObjectIdentifier, url: URL?, data: Data?, type: String? = nil,
+                        status: Int? = nil, headers extra: [String: String] = [:]) {
         guard running.remove(id) != nil, let url else { return }
         let body = data.map(Self.inflated)
-        let headers = ["Access-Control-Allow-Origin": session?.origin.originString ?? "*", "Content-Type": Self.contentType(body),
-                       "Cache-Control": "no-store"]
-        let response = HTTPURLResponse(url: url, statusCode: body == nil ? 404 : 200, httpVersion: "HTTP/1.1", headerFields: headers)!
+        var headers = ["Access-Control-Allow-Origin": session?.origin.originString ?? "*", "Vary": "Origin",
+                       "Content-Type": type ?? Self.contentType(body), "Cache-Control": "no-store"]
+        headers.merge(extra) { $1 }
+        let response = HTTPURLResponse(url: url, statusCode: status ?? (body == nil ? 404 : 200), httpVersion: "HTTP/1.1", headerFields: headers)!
         task.didReceive(response)
         task.didReceive(body ?? Data())
         task.didFinish()
@@ -351,6 +459,35 @@ public final class OfflineMapExtension: NSObject, ShellExtension, WKURLSchemeHan
         guard at < bytes.count - 8,
               let body = try? (Data(bytes[at..<(bytes.count - 8)]) as NSData).decompressed(using: .zlib) else { return data }
         return body as Data
+    }
+}
+
+/// WHAT A MAP NEEDS BESIDES ITS TILES: the style, glyphs and sprite a page took from a tile origin, kept as they came
+/// (one file each under the regions' folder, `kept/`, the type on the first line) and answered when the network is gone.
+/// Kept only while a region is on the phone; deleted with the regions.
+enum KeptAnswers {
+    /// A style, a glyph range or a sprite is far smaller: anything larger is not kept.
+    static let maxBytes = 2 * 1024 * 1024
+
+    static func save(in dir: URL, url: String, type: String, body: Data) {
+        guard body.count <= maxBytes else { return }
+        let folder = dir.appendingPathComponent("kept", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? encode(type: type, body: body).write(to: folder.appendingPathComponent(key(url)), options: .atomic)
+    }
+
+    static func read(in dir: URL, url: String) -> (type: String, body: Data)? {
+        (try? Data(contentsOf: dir.appendingPathComponent("kept", isDirectory: true).appendingPathComponent(key(url)))).flatMap(decode)
+    }
+
+    /// One file per address, named by its SHA-256 (the query too).
+    static func key(_ url: String) -> String { SHA256.hash(data: Data(url.utf8)).map { String(format: "%02x", $0) }.joined() }
+
+    static func encode(type: String, body: Data) -> Data { Data((type.replacingOccurrences(of: "\n", with: "") + "\n").utf8) + body }
+
+    static func decode(_ data: Data) -> (type: String, body: Data)? {
+        guard let end = data.firstIndex(of: 0x0A), end > data.startIndex else { return nil }
+        return (String(decoding: data[data.startIndex..<end], as: UTF8.self), Data(data[data.index(after: end)...]))
     }
 }
 
