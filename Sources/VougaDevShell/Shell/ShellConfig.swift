@@ -48,6 +48,9 @@ public struct ShellConfig {
     public var accountDeletionURL: String?
     /// Push notifications through the hub; nil: none, and the permission is never asked.
     public var push: ShellPush.Settings?
+    /// false: notifications are asked right after a sign-in, once; true: the shell never asks on its own and the site
+    /// asks through `askNotifications()` when it chooses (Lexi: after a lawyer's guided steps, then on each new device).
+    public var notificationsAskedBySite = false
     /// The purposes the site asks consent for; nil: no consent dialog.
     public var consent: ShellConsent.Settings?
     /// Every company page carries `<meta name="vougadev-page" content="<service>">`: on the site's and the payment

@@ -752,7 +752,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         if newSignIn {
             replaceWebView()
             afterNewSignIn()
-            if let push = session.push, !push.asked { return show(.askPush) }
+            if let push = session.push, !push.asked, !session.config.notificationsAskedBySite { return show(.askPush) }
         }
         openAfterSignIn()
     }
@@ -838,7 +838,45 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         members.append(("consent", { [weak self] _, answer in
             answer(self?.session.consent?.state() ?? [:])
         }))
+        members.append(("notificationState", { [weak self] _, answer in
+            Task { answer(["state": await self?.notificationState() ?? "unavailable"]) }
+        }))
+        members.append(("askNotifications", { [weak self] _, answer in
+            guard let self else { return answer(["state": "unavailable"]) }
+            self.askNotificationsFromSite { answer(["state": $0]) }
+        }))
         return members
+    }
+
+    /// "granted": notifications reach this phone; "prompt": the system's question may be asked; "denied": only the
+    /// phone's settings turn them on; "unavailable": this build receives no push.
+    private func notificationState() async -> String {
+        guard let push = session.push else { return "unavailable" }
+        switch await push.permission {
+        case .authorized, .provisional, .ephemeral: return "granted"
+        case .notDetermined: return "prompt"
+        default: return "denied"
+        }
+    }
+
+    /// `askNotifications()`: the app's sentence, then the system's dialog, when it may still be asked; the state after.
+    private func askNotificationsFromSite(_ answer: @escaping (String) -> Void) {
+        Task { @MainActor in
+            let state = await notificationState()
+            guard state == "prompt", let push = session.push else { return answer(state) }
+            let alert = UIAlertController(title: nil, message: Strings.text("shell_push_text"), preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: Strings.text("shell_push_later"), style: .cancel) { _ in
+                push.markAsked()
+                answer(state)
+            })
+            alert.addAction(UIAlertAction(title: Strings.text("shell_push_continue"), style: .default) { [weak self] _ in
+                Task { @MainActor in
+                    await push.requestPermission()
+                    answer(await self?.notificationState() ?? "unavailable")
+                }
+            })
+            presenter.present(alert, animated: true)
+        }
     }
 
     /// The app's native Settings ([SettingsViewController]).
