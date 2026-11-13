@@ -1,0 +1,2 @@
+/* El nombre del archivo de un documento escaneado; %@ es la fecha y la hora. */
+"documents_scan_name" = "Documento escaneado %@";

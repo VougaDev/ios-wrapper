@@ -29,6 +29,8 @@ only through `features()`.
 | `startTracking({missionId, url?, intervalSeconds?, target?, title?, text?})` | `Promise<{ok: true} \| {ok: false, error}>` | `tracking` |
 | `stopTracking()` | `Promise<{ok: true}>` | `tracking` |
 | `trackingState()` | `Promise<{active, missionId, lastSentAt, lastError}>` | `tracking` |
+| `scanDocument()` | `Promise<{ok: true, file: {name, type, size, data}}>` (`data` in base64), or `{ok: false, error}`: `cancelled`, `unavailable`, `too_large`, `busy` | `documents` |
+| `sharedFiles()` | `Promise<{ok: true, files: [{name, type, size, data}]}>`: the files another app opened in this one, handed over once | `documents` |
 | (none) | the site's own map tiles work offline | `offline-map` |
 | an app's own members | as its contract says (Ship: `openMissions({url?})`) | the app |
 
@@ -96,6 +98,14 @@ real extension**: an app whose `features()` is empty is a web clipping (App Revi
   site's origin>`, and a CORS preflight is answered on the phone. The site allows `vougadev-tiles:` in `connect-src`
   and drops `Authorization` while offline (`navigator.onLine` false, in MapLibre's synchronous `transformRequest`), as
   on Android.
+- **`documents`** ([`VougaDevDocuments`](Sources/VougaDevDocuments)): `scanDocument()` opens Apple's document camera
+  (VisionKit: edges found, pages straightened, several pages) and gives one PDF; `sharedFiles()` hands over the files
+  another app opened in this one. The app declares `CFBundleDocumentTypes` (PDF, Word, JPEG, PNG, WebP, role Viewer,
+  rank Alternate) with `LSSupportsOpeningDocumentsInPlace` false, so it shows in the share sheet and "Open in", and its
+  scene passes the file URLs (`scene(_:openURLContexts:)`, and `connectionOptions.urlContexts` at a cold start) to
+  `documents.receive(urls, shell:)`: the files of `types` up to `maxBytes` are kept in the caches and
+  `receivePath` opens, after the sign-in when there is none. Emptied on sign-out. Needs `NSCameraUsageDescription`.
+  `DocumentsExtension(config: DocumentsConfig(receivePath: "/assistant/receive/"))`; the same contract as Android's.
 - **An app's own** (Ship's `missions`): in the app's repository, the same protocol.
 
 ## An app on the shell

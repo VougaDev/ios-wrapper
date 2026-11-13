@@ -154,7 +154,12 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 await session.cookies.clear()
                 forgetLocalData()
                 if !online, let last = session.offlinePages.entries.first { return showKept(last) }
-                if online && !session.config.signInFirst { return openSignedOut(home) }
+                if online && !session.config.signInFirst {
+                    // a page asked from outside (a shared file's) loads signed out: the site asks for the sign-in itself
+                    let target = afterSignIn ?? home
+                    afterSignIn = nil
+                    return openSignedOut(target)
+                }
                 return show(online ? .signIn : .offlineWelcome)
             }
             if SessionCookies.isSignedIn(await session.cookies.jar()) {
@@ -831,7 +836,9 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         }
     }
 
-    private func openWhenReady(_ url: String) {
+    /// A page asked from outside the web view (a notification, a file another app shared): now when the shell is ready,
+    /// else once it is - after the sign-in when there is none.
+    public func openWhenReady(_ url: String) {
         if booted && screen == nil { open(url) } else { afterSignIn = url }
     }
 

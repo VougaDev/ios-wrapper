@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "VougaDevShell", targets: ["VougaDevShell"]),
         .library(name: "VougaDevTracking", targets: ["VougaDevTracking"]),
         .library(name: "VougaDevOfflineMap", targets: ["VougaDevOfflineMap"]),
+        .library(name: "VougaDevDocuments", targets: ["VougaDevDocuments"]),
     ],
     dependencies: [
         // Push in every app: FCM on iOS as on Android (VougaDev Notify sends to both); inert without the app's
@@ -22,6 +23,7 @@ let package = Package(
                 resources: [.process("Resources")]),
         .target(name: "VougaDevTracking", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
         .target(name: "VougaDevOfflineMap", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
-        .testTarget(name: "VougaDevShellTests", dependencies: ["VougaDevShell", "VougaDevTracking", "VougaDevOfflineMap"]),
+        .target(name: "VougaDevDocuments", dependencies: ["VougaDevShell"], resources: [.process("Resources")]),
+        .testTarget(name: "VougaDevShellTests", dependencies: ["VougaDevShell", "VougaDevTracking", "VougaDevOfflineMap", "VougaDevDocuments"]),
     ]
 )

@@ -1,0 +1,2 @@
+/* A scanned document's file name; %@ is the date and time. */
+"documents_scan_name" = "Scan %@";
