@@ -155,7 +155,7 @@ final class OfflinePagesTests: XCTestCase {
     }
 }
 
-final class OfflineMapTests: XCTestCase {
+final class OfflineMapScriptTests: XCTestCase {
 
     func testTilePathMatchesTheSitesTiles() {
         let path = TilePath("/tiles/{source}/{z}/{x}/{y}.pbf")!
