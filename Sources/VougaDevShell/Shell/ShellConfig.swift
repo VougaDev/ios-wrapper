@@ -51,6 +51,10 @@ public struct ShellConfig {
     /// false: notifications are asked right after a sign-in, once; true: the shell never asks on its own and the site
     /// asks through `askNotifications()` when it chooses (Lexi: after a lawyer's guided steps, then on each new device).
     public var notificationsAskedBySite = false
+    /// true: the app opens on the sign-in until the person is signed in (Jobs, Ship: nothing works signed out); false:
+    /// the site's public pages signed out, the sign-in when the site asks for it (Lexi: the law and the directory need
+    /// no account, App Review 5.1.1(v)). As on Android.
+    public var signInFirst = true
     /// The purposes the site asks consent for; nil: no consent dialog.
     public var consent: ShellConsent.Settings?
     /// Every company page carries `<meta name="vougadev-page" content="<service>">`: on the site's and the payment

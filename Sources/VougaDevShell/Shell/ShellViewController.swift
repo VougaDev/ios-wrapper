@@ -153,6 +153,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
                 await session.cookies.clear()
                 forgetLocalData()
                 if !online, let last = session.offlinePages.entries.first { return showKept(last) }
+                if online && !session.config.signInFirst { return openSignedOut(home) }
                 return show(online ? .signIn : .offlineWelcome)
             }
             if SessionCookies.isSignedIn(await session.cookies.jar()) {
@@ -254,7 +255,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         // sign-in this app no longer holds (started before the app was closed) goes back to the sign-in.
         if url.absoluteString.hasPrefix(session.config.redirectURI) {
             decisionHandler(.cancel)
-            guard pendingSignIn != nil else { return show(.signIn) }
+            guard pendingSignIn != nil else { return session.config.signInFirst ? show(.signIn) : openSignedOut(home) }
             let request = pendingSignIn
             if case let .code(code) = request?.read(callback: url, client: session.client) {
                 Task { _ = await completeWebSignIn(code: code, state: request?.state) }
@@ -303,7 +304,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             let items = isSite ? URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] : []
             let next = items.first { $0.name == "next" }?.value
             let extra = SignInRoute.asks(items)
-            if extra.isEmpty {
+            if extra.isEmpty && session.signedIn {
                 renewThen(SignInRoute.after(origin, next: next))
             } else {
                 afterSignIn = SignInRoute.after(origin, next: next)
@@ -779,8 +780,14 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
             replaceWebView()
             afterSignIn = nil
             forgetLocalData()
-            show(.signIn)
+            if session.config.signInFirst { show(.signIn) } else { openSignedOut(home) }
         }
+    }
+
+    /// Not signed in, the site's public pages ([ShellConfig.signInFirst] false).
+    private func openSignedOut(_ url: String) {
+        hidePanel()
+        open(url)
     }
 
     private func signedInPage() {
