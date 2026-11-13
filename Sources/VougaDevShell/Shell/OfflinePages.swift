@@ -171,6 +171,9 @@ final class NetworkWatch {
 /// The quiet bar over a kept page: "Offline · updated at 14:32".
 final class OfflineBar: UIView {
     private let label = UILabel()
+    /// Shown or hidden, by any path: the web view then ends above it or at the bottom again.
+    var onToggle: (() -> Void)?
+    override var isHidden: Bool { didSet { if isHidden != oldValue { onToggle?() } } }
 
     init(colors: ShellColors) {
         super.init(frame: .zero)

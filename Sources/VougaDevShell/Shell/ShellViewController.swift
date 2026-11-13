@@ -126,6 +126,7 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         // A tapped notification; one that arrived before this screen existed (a cold start) is handed over now.
         session.push?.onRoute = { [weak self] in self?.route($0) }
         offlineBar.isHidden = true
+        offlineBar.onToggle = { [weak self] in self?.fitWebToBar() }
         offlineBar.translatesAutoresizingMaskIntoConstraints = false
         view.insertSubview(offlineBar, belowSubview: panel)
         NSLayoutConstraint.activate([
@@ -198,11 +199,25 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         view.insertSubview(web, at: 0)
         NSLayoutConstraint.activate([
             web.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            web.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         webView = web
+        webBottom = nil
+        fitWebToBar()
+    }
+
+    private var webBottom: NSLayoutConstraint?
+
+    /// The web view ends above the offline bar while it shows, so a site's own bottom tabs stay visible and tappable;
+    /// at the screen's bottom otherwise.
+    private func fitWebToBar() {
+        guard let web = webView else { return }
+        webBottom?.isActive = false
+        webBottom = offlineBar.superview == nil || offlineBar.isHidden
+            ? web.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            : web.bottomAnchor.constraint(equalTo: offlineBar.topAnchor)
+        webBottom?.isActive = true
     }
 
     /// A new web view, with no history: another person may have used the phone before, and has no way back to their pages.
