@@ -546,10 +546,12 @@ open class ShellViewController: UIViewController, WKNavigationDelegate, WKUIDele
         present(alert, animated: true)
     }
 
-    /// The site's pages do not stream the camera or the microphone.
+    /// The camera and the microphone, for a video call on the site's own pages: only when the app declares their purpose
+    /// strings, and the system then asks the person. Any other origin, or an app that declares neither, is refused. As on Android.
     public func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                         type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-        decisionHandler(.deny)
+        let ours = self.origin.matchesParts(scheme: origin.protocol, host: origin.host, port: origin.port)
+        decisionHandler(ours && MediaGrant.declared(type, in: Bundle.main) ? .prompt : .deny)
     }
 
     // MARK: - Links outside

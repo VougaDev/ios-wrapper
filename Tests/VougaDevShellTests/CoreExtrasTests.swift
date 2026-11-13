@@ -1,4 +1,5 @@
 import UIKit
+import WebKit
 import XCTest
 @testable import VougaDevOfflineMap
 @testable import VougaDevShell
@@ -186,5 +187,15 @@ final class OfflineMapTests: XCTestCase {
         XCTAssertTrue(script.contains(#"if (window.location.origin !== ["https:\/\/app.example.org"][0]) { return; }"#))
         XCTAssertTrue(script.contains("vougadev-tiles://tile"))
         XCTAssertTrue(script.contains("window.Worker = function"))
+    }
+}
+
+final class MediaGrantTests: XCTestCase {
+
+    func testACallNeedsThePurposeOfEachDevice() {
+        XCTAssertEqual(MediaGrant.keys(.camera), ["NSCameraUsageDescription"])
+        XCTAssertEqual(MediaGrant.keys(.cameraAndMicrophone), ["NSCameraUsageDescription", "NSMicrophoneUsageDescription"])
+        // The test bundle declares neither: nothing is granted.
+        XCTAssertFalse(MediaGrant.declared(.microphone, in: Bundle(for: MediaGrantTests.self)))
     }
 }
