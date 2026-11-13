@@ -102,7 +102,7 @@ final class BridgeTests: XCTestCase {
         ] {
             XCTAssertTrue(controller.responds(to: NSSelectorFromString(selector)), selector)
         }
-        XCTAssertEqual(controller.bridgeMethods().map { $0.0 }, ["openSettings", "openOutside", "network", "consent", "startTracking", "stopTracking", "trackingState"])
+        XCTAssertEqual(controller.bridgeMethods().map { $0.0 }, ["openSettings", "openOutside", "network", "consent", "notificationState", "askNotifications", "startTracking", "stopTracking", "trackingState"])
         XCTAssertEqual(AppSession.missingRequirements([tracking], info: [:]),
                        ["NSLocationWhenInUseUsageDescription", "UIBackgroundModes: location", "NSLocationTemporaryUsageDescriptionDictionary: Tracking"])
         XCTAssertEqual(AppSession.missingRequirements([tracking], info: [
